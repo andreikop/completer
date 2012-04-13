@@ -210,15 +210,20 @@ class Completion:
     def _makeInlineCompletion(self, text):
         return text[len(self.originalText):]
 
+    def _commonStart(self, a, b):
+        for index, char in enumerate(a):
+            if len(b) <= index or b[index] != char:
+                return a[:index]
+        return a
+
     def inline(self):
         if self.error is not None:
             return None
-        elif self.dirs:
-            return self._makeInlineCompletion(self.dirs[0])
-        elif self.files:
-            return self._makeInlineCompletion(self.files[0])
         else:
-            return None
+            if self.dirs or self.files:
+                return self._makeInlineCompletion(reduce(self._commonStart, self.dirs + self.files))
+            else:
+                return ''
 
 
 def completeText(text):
