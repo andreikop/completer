@@ -3,10 +3,10 @@
 import sip
 sip.setapi('QString', 2)
 
-from PyQt4.QtCore import QSize, Qt
-from PyQt4.QtGui import QApplication, QFontMetrics, QVBoxLayout, QSizePolicy, QStyle, \
+from PyQt4.QtCore import pyqtSignal, QSize, Qt
+from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
                         QStyleOptionFrameV2, \
-                        QTextCursor, QTextEdit, QTextOption, QListView, QWidget
+                        QTextCursor, QTextEdit, QTextOption, QListView, QVBoxLayout, QWidget
 
 import sys
 
@@ -81,8 +81,8 @@ class ListModel(QAbstractItemModel):
         self._completion = completion
         self.modelReset.emit()
 
-
 class CompletableLineEdit(QTextEdit):
+    tryToComplete = pyqtSignal()
     def __init__(self, *args):
         QTextEdit.__init__(self, *args)
         self.setTabChangesFocus(True)
@@ -92,7 +92,7 @@ class CompletableLineEdit(QTextEdit):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setFixedHeight(self.sizeHint().height())
         self._inlineCompletion = None
-    
+        
     def sizeHint(self):
         fm = QFontMetrics(self.font())
         h = max(fm.height(), 14) + 4
@@ -104,31 +104,28 @@ class CompletableLineEdit(QTextEdit):
                                              QSize(w, h).expandedTo(QApplication.globalStrut()),
                                              self)
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Tab:
+    def event(self, event):
+        if event.type() == event.KeyPress and \
+           event.key() == Qt.Key_Tab:
             self.insertPlainText(self._inlineCompletion)
             self._clearInlineCompletion()
-            self._tryToComplete()
+            if self.textCursor().atEnd():
+                self.tryToComplete.emit()
+            return True
         else:
-            self._clearInlineCompletion()
-            QTextEdit.keyPressEvent(self, event)
-            self._tryToComplete()
+            return QTextEdit.event(self, event)
+    
+    def keyPressEvent(self, event):
+        self._clearInlineCompletion()
+        QTextEdit.keyPressEvent(self, event)
+        if self.textCursor().atEnd():
+            self.tryToComplete.emit()
     
     def mousePressEvent(self, event):
         self._clearInlineCompletion()
         QTextEdit.mousePressEvent(self, event)
-        self._tryToComplete()
-
-    def _tryToComplete(self):
-        if not self.textCursor().atEnd():
-            return
-        
-        text = self.toPlainText()
-        completion = completeText(text)
-        inline = completion.inline()
-        if inline:
-            self._setInlineCompletion(inline[len(text):])
-        self.parent()._model.setCompletion(completion)
+        if self.textCursor().atEnd():
+            self.tryToComplete.emit()
 
     def _clearInlineCompletion(self):
         if self._inlineCompletion is not None:
@@ -137,13 +134,17 @@ class CompletableLineEdit(QTextEdit):
                 cursor.deleteChar()
             self._inlineCompletion = None
     
-    def _setInlineCompletion(self, text):
+    def setInlineCompletion(self, text):
         self._inlineCompletion = text
         cursor = self.textCursor()
         pos = cursor.position()
-        cursor.insertHtml('<font color=red>%s</font>' % text)
+        color = self.palette().color(QPalette.Highlight).name()
+        cursor.insertHtml('<font style="background-color: %s">%s</font>' % (color, text))
         cursor.setPosition(pos)
         self.setTextCursor(cursor)
+    
+    def text(self):
+        return self.toPlainText()
 
 class CommandConsole(QWidget):
     def __init__(self, *args):
@@ -161,53 +162,85 @@ class CommandConsole(QWidget):
         
         self._edit = CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
+        self._edit.tryToComplete.connect(self._tryToComplete)
         self.setFocusProxy(self._edit)
         
         #self._list.hide()
         self._edit.setFocus()
 
+    def _tryToComplete(self):
+        text = self._edit.toPlainText()
+        completion = completeText(text)
+        inline = completion.inline()
+        if inline:
+            self._edit.setInlineCompletion(inline)
+        self._model.setCompletion(completion)
+
+
 import os
 import os.path
 
 class Completion:
-    def __init__(self):
+    def __init__(self, originalText=""):
+        self.originalText = originalText
         self.dirs = []
         self.files = []
+        self.error = None
     
     def count(self):
-        return len(self.dirs) + len(self.files)
+        if self.error is not None:
+            return 1
+        else:
+            return len(self.dirs) + len(self.files)
+    
+    def _makeListItem(self, text):
+        return '<b>%s</b>%s' % (text[:len(self.originalText)], text[len(self.originalText):])
+    
+    def _makeError(self, text):
+        return '<i>%s</i>' % text
     
     def item(self, index):
-        if index < len(self.dirs):
-            return self.dirs[index]
+        if self.error is not None:
+            return self._makeError(self.error)
+        elif index < len(self.dirs):
+            return self._makeListItem(self.dirs[index])
         else:
-            return self.files[index - len(self.dirs)]
+            return self._makeListItem(self.files[index - len(self.dirs)])
     
+    def _makeInlineCompletion(self, text):
+        return text[len(self.originalText):]
+
     def inline(self):
-        if self.dirs:
-            return self.dirs[0]
+        if self.error is not None:
+            return None
+        elif self.dirs:
+            return self._makeInlineCompletion(self.dirs[0])
         elif self.files:
-            return self.files[0]
+            return self._makeInlineCompletion(self.files[0])
         else:
             return None
 
+
 def completeText(text):
-    completion = Completion()
+    completion = Completion(text)
     text = os.path.expanduser(text)
     dirname = os.path.dirname(text)
     basename = os.path.basename(text)
     if os.path.isdir(dirname):
         # filter matching
-        variants = [os.path.join(dirname, path) \
-                        for path in os.listdir(dirname) \
-                            if path.startswith(basename)]
-        
-        for variant in variants:
-            if os.path.isdir(os.path.join(dirname, variant)):
-                completion.dirs.append(variant + '/')
-            else:
-                completion.files.append(variant)
-        
+        try:
+            variants = [os.path.join(dirname, path) \
+                            for path in os.listdir(dirname) \
+                                if path.startswith(basename)]
+            
+            for variant in variants:
+                if os.path.isdir(os.path.join(dirname, variant)):
+                    completion.dirs.append(variant + '/')
+                else:
+                    completion.files.append(variant)
+        except OSError, ex:
+            completion.error = unicode(str(ex), 'utf8')
+
     return completion
 
 def main():
