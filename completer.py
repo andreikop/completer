@@ -228,18 +228,17 @@ class Completion:
 
 def completeText(text):
     completion = Completion(text)
-    text = os.path.expanduser(text)
     dirname = os.path.dirname(text)
     basename = os.path.basename(text)
-    if os.path.isdir(dirname):
+    if os.path.isdir(os.path.expanduser(dirname)):
         # filter matching
         try:
             variants = [os.path.join(dirname, path) \
-                            for path in os.listdir(dirname) \
+                            for path in os.listdir(os.path.expanduser(dirname)) \
                                 if path.startswith(basename)]
             
             for variant in variants:
-                if os.path.isdir(os.path.join(dirname, variant)):
+                if os.path.isdir(os.path.join(os.path.expanduser(dirname), variant)):
                     completion.dirs.append(variant + '/')
                 else:
                     completion.files.append(variant)
