@@ -194,7 +194,9 @@ class Completion:
             return len(self.dirs) + len(self.files)
     
     def _makeListItem(self, text):
-        return '<b>%s</b>%s' % (text[:len(self.originalText)], text[len(self.originalText):])
+        text = os.path.split(text)[1]  # leave only the last part
+        typedLen = len(os.path.split(self.originalText)[1])
+        return '<b>%s</b>%s' % (text[:typedLen], text[typedLen:])
     
     def _makeError(self, text):
         return '<i>%s</i>' % text
@@ -239,7 +241,7 @@ def completeText(text):
             
             for variant in variants:
                 if os.path.isdir(os.path.join(os.path.expanduser(dirname), variant)):
-                    completion.dirs.append(variant + '/')
+                    completion.dirs.append(variant)
                 else:
                     completion.files.append(variant)
         except OSError, ex:
