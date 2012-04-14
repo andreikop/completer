@@ -195,6 +195,7 @@ import os.path
 class Completion:
     def __init__(self, originalText=""):
         self.originalText = originalText
+        self.path = None
         self.dirs = []
         self.files = []
         self.error = None
@@ -223,9 +224,6 @@ class Completion:
         """
         return len(os.path.split(self.originalText)[1])
     
-    def _makeInlineCompletion(self, text):
-        return text[len(self.originalText):]
-
     def _commonStart(self, a, b):
         for index, char in enumerate(a):
             if len(b) <= index or b[index] != char:
@@ -237,7 +235,8 @@ class Completion:
             return None
         else:
             if self.dirs or self.files:
-                return self._makeInlineCompletion(reduce(self._commonStart, self.dirs + self.files))
+                commonPart = reduce(self._commonStart, self.dirs + self.files)
+                return commonPart[self.lastTypedSegmentLength():]
             else:
                 return ''
 
@@ -246,15 +245,16 @@ def completeText(text):
     completion = Completion(text)
     dirname = os.path.dirname(text)
     basename = os.path.basename(text)
-    if os.path.isdir(os.path.expanduser(dirname)):
+    completion.path = dirname
+    expandedDir = os.path.expanduser(dirname)
+    if os.path.isdir(expandedDir):
         # filter matching
         try:
-            variants = [os.path.join(dirname, path) \
-                            for path in os.listdir(os.path.expanduser(dirname)) \
-                                if path.startswith(basename)]
+            variants = [path for path in os.listdir(expandedDir) \
+                            if path.startswith(basename)]
             
             for variant in variants:
-                if os.path.isdir(os.path.join(os.path.expanduser(dirname), variant)):
+                if os.path.isdir(os.path.join(expandedDir, variant)):
                     completion.dirs.append(variant + '/')
                 else:
                     completion.files.append(variant)
