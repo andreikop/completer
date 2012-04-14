@@ -73,13 +73,25 @@ class ListModel(QAbstractItemModel):
     
     def data(self, index, role):
         if role == Qt.DisplayRole:
-            return self._completion.item(index.row())
+            itemType, item = self._completion.item(index.row())
+            if itemType == 'error':
+                return self._formatError(item)
+            else:
+                return self._formatListItem(item)
         else:
             return None
     
     def setCompletion(self, completion):
         self._completion = completion
         self.modelReset.emit()
+
+    def _formatListItem(self, text):
+        typedLen = self._completion.lastTypedSegmentLength()
+        return '<b>%s</b>%s' % (text[:typedLen], text[typedLen:])
+
+    def _formatError(self, text):
+        return '<i>%s</i>' % text
+
 
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()
@@ -197,23 +209,22 @@ class Completion:
         # Leave only last segment of the path
         beforeSlash, afterSlash = os.path.split(text)
         if afterSlash:  # a file
-            text = afterSlash
+            return afterSlash
         else:  # a directory
-            text = os.path.split(beforeSlash)[1]
-        
-        typedLen = len(os.path.split(self.originalText)[1])
-        return '<b>%s</b>%s' % (text[:typedLen], text[typedLen:])
-    
-    def _makeError(self, text):
-        return '<i>%s</i>' % text
-    
+            return os.path.split(beforeSlash)[1]
+
     def item(self, index):
         if self.error is not None:
-            return self._makeError(self.error)
+            return 'error', self.error
         elif index < len(self.dirs):
-            return self._makeListItem(self.dirs[index])
+            return 'directory', self._makeListItem(self.dirs[index])
         else:
-            return self._makeListItem(self.files[index - len(self.dirs)])
+            return 'file', self._makeListItem(self.files[index - len(self.dirs)])
+    
+    def lastTypedSegmentLength(self):
+        """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
+        """
+        return len(os.path.split(self.originalText)[1])
     
     def _makeInlineCompletion(self, text):
         return text[len(self.originalText):]
