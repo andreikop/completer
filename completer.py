@@ -57,7 +57,7 @@ from PyQt4.QtCore import QAbstractItemModel, QModelIndex
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completion = Completion()  # initial, empty
+        self._completion = Completion(None)  # initial, empty
 
     def index(self, row, column, parent):
         return self.createIndex(row, column)
@@ -182,7 +182,7 @@ class CommandConsole(QWidget):
 
     def _tryToComplete(self):
         text = self._edit.toPlainText()
-        completion = completeText(text)
+        completion = Completion(text)
         inline = completion.inline()
         if inline:
             self._edit.setInlineCompletion(inline)
@@ -193,13 +193,34 @@ import os
 import os.path
 
 class Completion:
-    def __init__(self, originalText=""):
-        self.originalText = originalText
-        self.path = None
+    def __init__(self, text):
+        self.originalText = text
         self.dirs = []
         self.files = []
         self.error = None
-    
+        if text is None:
+            return
+        
+        dirname = os.path.dirname(text)
+
+        basename = os.path.basename(text)
+        expandedDir = os.path.expanduser(dirname)
+        if os.path.isdir(expandedDir):
+            # filter matching
+            try:
+                variants = [path for path in os.listdir(expandedDir) \
+                                if path.startswith(basename)]
+                
+                for variant in variants:
+                    if os.path.isdir(os.path.join(expandedDir, variant)):
+                        self.dirs.append(variant + '/')
+                    else:
+                        self.files.append(variant)
+            except OSError, ex:
+                self.error = unicode(str(ex), 'utf8')
+        else:
+            self.error = 'No directory %s' % dirname
+
     def count(self):
         if self.error is not None:
             return 1
@@ -240,29 +261,6 @@ class Completion:
             else:
                 return ''
 
-
-def completeText(text):
-    completion = Completion(text)
-    dirname = os.path.dirname(text)
-    basename = os.path.basename(text)
-    completion.path = dirname
-    expandedDir = os.path.expanduser(dirname)
-    if os.path.isdir(expandedDir):
-        # filter matching
-        try:
-            variants = [path for path in os.listdir(expandedDir) \
-                            if path.startswith(basename)]
-            
-            for variant in variants:
-                if os.path.isdir(os.path.join(expandedDir, variant)):
-                    completion.dirs.append(variant + '/')
-                else:
-                    completion.files.append(variant)
-        except OSError, ex:
-            completion.error = unicode(str(ex), 'utf8')
-    else:
-        completion.error = 'No directory %s' % dirname
-    return completion
 
 def main():
     app = QApplication(sys.argv)
