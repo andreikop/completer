@@ -205,21 +205,18 @@ class Completion:
         else:
             return len(self.dirs) + len(self.files)
     
-    def _makeListItem(self, text):
-        # Leave only last segment of the path
-        beforeSlash, afterSlash = os.path.split(text)
-        if afterSlash:  # a file
-            return afterSlash
-        else:  # a directory
-            return os.path.split(beforeSlash)[1]
-
     def item(self, index):
         if self.error is not None:
             return 'error', self.error
         elif index < len(self.dirs):
-            return 'directory', self._makeListItem(self.dirs[index])
+            dirPath = self.dirs[index]
+            dirPathNoSlash = os.path.split(dirPath)[0]
+            parDir, dirName = os.path.split(dirPathNoSlash)
+            return 'directory', dirName + '/'
         else:
-            return 'file', self._makeListItem(self.files[index - len(self.dirs)])
+            filePath = self.files[index - len(self.dirs)]
+            fileName = os.path.split(filePath)[1]
+            return 'file', fileName
     
     def lastTypedSegmentLength(self):
         """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
