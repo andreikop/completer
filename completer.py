@@ -260,7 +260,8 @@ def completeText(text):
                     completion.files.append(variant)
         except OSError, ex:
             completion.error = unicode(str(ex), 'utf8')
-
+    else:
+        completion.error = 'No directory %s' % dirname
     return completion
 
 def main():
