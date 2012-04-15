@@ -4,8 +4,8 @@ import sip
 sip.setapi('QString', 2)
 
 from PyQt4.QtCore import pyqtSignal, QSize, Qt
-from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
-                        QStyleOptionFrameV2, \
+from PyQt4.QtGui import qApp, QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
+                        QStyle, QStyleOptionFrameV2, \
                         QTextCursor, QTextEdit, QTextOption, QListView, QVBoxLayout, QWidget
 
 import sys
@@ -23,6 +23,7 @@ class HTMLDelegate(QtGui.QStyledItemDelegate):
         doc = QtGui.QTextDocument()
         doc.setDocumentMargin(1)
         doc.setHtml(options.text)
+        #  bad long (multiline) strings processing doc.setTextWidth(options.rect.width())
 
         options.text = ""
         style.drawControl(QtGui.QStyle.CE_ItemViewItem, options, painter);
@@ -47,8 +48,8 @@ class HTMLDelegate(QtGui.QStyledItemDelegate):
 
         doc = QtGui.QTextDocument()
         doc.setDocumentMargin(1)
+        #  bad long (multiline) strings processing doc.setTextWidth(options.rect.width())
         doc.setHtml(options.text)
-        doc.setTextWidth(options.rect.width())
         return QtCore.QSize(doc.idealWidth(), doc.size().height())
 
 
@@ -69,15 +70,18 @@ class ListModel(QAbstractItemModel):
         return self._completion.count()
     
     def columnCount(self, index):
-        return 1
+        return 2
     
     def data(self, index, role):
+        itemType, item = self._completion.item(index.row())
         if role == Qt.DisplayRole:
-            itemType, item = self._completion.item(index.row())
             if itemType == 'error':
                 return self._formatError(item)
             else:
                 return self._formatListItem(item)
+        elif role == Qt.DecorationRole:
+            if itemType == 'error':
+                return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
         else:
             return None
     
