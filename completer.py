@@ -4,7 +4,7 @@ import sip
 sip.setapi('QString', 2)
 
 from PyQt4.QtCore import pyqtSignal, QSize, Qt
-from PyQt4.QtGui import qApp, QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
+from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
                         QStyle, QStyleOptionFrameV2, \
                         QTextCursor, QTextEdit, QTextOption, QListView, QVBoxLayout, QWidget
 
@@ -54,11 +54,13 @@ class HTMLDelegate(QtGui.QStyledItemDelegate):
 
 
 from PyQt4.QtCore import QAbstractItemModel, QModelIndex
+from PyQt4.QtGui import qApp, QFileSystemModel
 
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self._completion = Completion(None)  # initial, empty
+        self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
         return self.createIndex(row, column)
@@ -82,8 +84,11 @@ class ListModel(QAbstractItemModel):
         elif role == Qt.DecorationRole:
             if itemType == 'error':
                 return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
-        else:
-            return None
+            else:
+                index = self._fsModel.index(os.path.join(self._completion.path, item))
+                return self._fsModel.data(index, role)
+            
+        return None
     
     def setCompletion(self, completion):
         self._completion = completion
@@ -206,6 +211,7 @@ class Completion:
             return
         
         dirname = os.path.dirname(text)
+        self.path = dirname
 
         basename = os.path.basename(text)
         expandedDir = os.path.expanduser(dirname)
