@@ -226,6 +226,8 @@ class Completion:
                         self.dirs.append(variant + '/')
                     else:
                         self.files.append(variant)
+                self.dirs.sort()
+                self.files.sort()
             except OSError, ex:
                 self.error = unicode(str(ex), 'utf8')
         else:
