@@ -202,7 +202,7 @@ class Completion:
         self.dirs = []
         self.files = []
         self.error = None
-        if text is None:
+        if text is None or not text:
             return
         
         dirname = os.path.dirname(text)
