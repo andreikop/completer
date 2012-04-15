@@ -219,7 +219,8 @@ class Completion:
             # filter matching
             try:
                 variants = [path for path in os.listdir(expandedDir) \
-                                if path.startswith(basename)]
+                                if path.startswith(basename) and \
+                                   not path.startswith('.')]
                 
                 for variant in variants:
                     if os.path.isdir(os.path.join(expandedDir, variant)):
