@@ -59,7 +59,7 @@ from PyQt4.QtGui import qApp, QFileSystemModel
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completion = Completion(None)  # initial, empty
+        self._completion = Completion('')  # initial, empty
         self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
@@ -79,16 +79,29 @@ class ListModel(QAbstractItemModel):
         if role == Qt.DisplayRole:
             if itemType == 'error':
                 return self._formatError(item)
-            else:
+            elif itemType == 'currentDir':
+                return self._formatCurrentDir(item)
+            elif itemType in ('file', 'directory'):
                 return self._formatListItem(item)
+            else:
+                assert False
         elif role == Qt.DecorationRole:
             if itemType == 'error':
                 return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
-            else:
+            elif itemType == 'currentDir':
+                return None
+            elif itemType in ('file', 'directory'):
                 index = self._fsModel.index(os.path.join(self._completion.path, item))
                 return self._fsModel.data(index, role)
             
         return None
+    
+    def flags(self, index):
+        retVal = QAbstractItemModel.flags(self, index)
+        itemType, item = self._completion.item(index.row())
+        if itemType in ('error', 'currentDir'):
+            retVal &= ~Qt.ItemIsSelectable  # clear flag
+        return retVal
     
     def setCompletion(self, completion):
         self._completion = completion
@@ -100,7 +113,12 @@ class ListModel(QAbstractItemModel):
 
     def _formatError(self, text):
         return '<i>%s</i>' % text
-
+    
+    def _formatCurrentDir(self, text):
+        return '<font style="background-color: %s; color: %s">%s</font>' % \
+                (qApp.palette().color(QPalette.Window).name(),
+                 qApp.palette().color(QPalette.WindowText).name(),
+                 text)
 
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()
@@ -203,60 +221,66 @@ import os.path
 
 class Completion:
     def __init__(self, text):
-        self.originalText = text
-        self.dirs = []
-        self.files = []
-        self.error = None
-        if text is None or not text:
-            return
+        self._originalText = text
+        self._dirs = []
+        self._files = []
+        self._error = None
+        self._relative = text is None or \
+                         (not text.startswith('/') and not text.startswith('~'))
         
-        dirname = os.path.dirname(text)
-        self.path = dirname
-
+        if text.startswith('/'):
+            absPath = text
+        elif text.startswith('~'):
+            absPath = os.path.expanduser(dirname)
+        else:  # relative path
+            absPath = os.path.abspath(os.path.join(os.path.curdir, text)) + '/'
+        
+        self.path = os.path.normpath(os.path.dirname(absPath)) + '/'
         basename = os.path.basename(text)
-        expandedDir = os.path.expanduser(dirname)
-        if os.path.isdir(expandedDir):
-            # filter matching
-            try:
-                variants = [path for path in os.listdir(expandedDir) \
-                                if path.startswith(basename) and \
-                                   not path.startswith('.')]
-                
-                for variant in variants:
-                    if os.path.isdir(os.path.join(expandedDir, variant)):
-                        self.dirs.append(variant + '/')
-                    else:
-                        self.files.append(variant)
-                self.dirs.sort()
-                self.files.sort()
-            except OSError, ex:
-                self.error = unicode(str(ex), 'utf8')
+        
+        if text:
+            if os.path.isdir(self.path):
+                # filter matching
+                try:
+                    variants = [path for path in os.listdir(self.path) \
+                                    if path.startswith(basename) and \
+                                       not path.startswith('.')]
+                    
+                    for variant in variants:
+                        if os.path.isdir(os.path.join(self.path, variant)):
+                            self._dirs.append(variant + '/')
+                        else:
+                            self._files.append(variant)
+                    self._dirs.sort()
+                    self._files.sort()
+                except OSError, ex:
+                    self._error = unicode(str(ex), 'utf8')
+            else:
+                self._error = 'No directory %s' % dirname
+        
+        self._items = []
+        if self._error:
+            self._items.append(('error', self._error))
         else:
-            self.error = 'No directory %s' % dirname
+            self._items.append(('currentDir', self.path))
+            for dirPath in self._dirs:
+                dirPathNoSlash = os.path.split(dirPath)[0]
+                parDir, dirName = os.path.split(dirPathNoSlash)
+                self._items.append(('directory', dirName + '/'))
+            for filePath in self._files:
+                fileName = os.path.split(filePath)[1]
+                self._items.append(('file', fileName))
 
     def count(self):
-        if self.error is not None:
-            return 1
-        else:
-            return len(self.dirs) + len(self.files)
+        return len(self._items)
     
     def item(self, index):
-        if self.error is not None:
-            return 'error', self.error
-        elif index < len(self.dirs):
-            dirPath = self.dirs[index]
-            dirPathNoSlash = os.path.split(dirPath)[0]
-            parDir, dirName = os.path.split(dirPathNoSlash)
-            return 'directory', dirName + '/'
-        else:
-            filePath = self.files[index - len(self.dirs)]
-            fileName = os.path.split(filePath)[1]
-            return 'file', fileName
-    
+        return self._items[index]
+
     def lastTypedSegmentLength(self):
         """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
         """
-        return len(os.path.split(self.originalText)[1])
+        return len(os.path.split(self._originalText)[1])
     
     def _commonStart(self, a, b):
         for index, char in enumerate(a):
@@ -265,11 +289,11 @@ class Completion:
         return a
 
     def inline(self):
-        if self.error is not None:
+        if self._error is not None:
             return None
         else:
-            if self.dirs or self.files:
-                commonPart = reduce(self._commonStart, self.dirs + self.files)
+            if self._dirs or self._files:
+                commonPart = reduce(self._commonStart, self._dirs + self._files)
                 return commonPart[self.lastTypedSegmentLength():]
             else:
                 return ''
