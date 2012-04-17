@@ -146,7 +146,8 @@ class CompletableLineEdit(QTextEdit):
     def event(self, event):
         if event.type() == event.KeyPress and \
            event.key() == Qt.Key_Tab:
-            self.insertPlainText(self._inlineCompletion)
+            color = self.palette().color(QPalette.Base).name()
+            self.insertHtml('<font style="background-color: %s">%s</font>' % (color, self._inlineCompletion))
             self._clearInlineCompletion()
             if self.textCursor().atEnd():
                 self.tryToComplete.emit()
