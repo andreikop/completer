@@ -245,25 +245,24 @@ class Completion:
 
         basename = os.path.basename(text)
         
-        if text:
-            if os.path.isdir(self.path):
-                # filter matching
-                try:
-                    variants = [path for path in os.listdir(self.path) \
-                                    if path.startswith(basename) and \
-                                       not path.startswith('.')]
-                    
-                    for variant in variants:
-                        if os.path.isdir(os.path.join(self.path, variant)):
-                            self._dirs.append(variant + '/')
-                        else:
-                            self._files.append(variant)
-                    self._dirs.sort()
-                    self._files.sort()
-                except OSError, ex:
-                    self._error = unicode(str(ex), 'utf8')
-            else:
-                self._error = 'No directory %s' % self.path
+        if os.path.isdir(self.path):
+            # filter matching
+            try:
+                variants = [path for path in os.listdir(self.path) \
+                                if path.startswith(basename) and \
+                                   not path.startswith('.')]
+                
+                for variant in variants:
+                    if os.path.isdir(os.path.join(self.path, variant)):
+                        self._dirs.append(variant + '/')
+                    else:
+                        self._files.append(variant)
+                self._dirs.sort()
+                self._files.sort()
+            except OSError, ex:
+                self._error = unicode(str(ex), 'utf8')
+        else:
+            self._error = 'No directory %s' % self.path
         
         self._items = []
         if self._error:
