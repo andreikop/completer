@@ -236,7 +236,7 @@ class Completion:
         if text.startswith('/'):
             absPath = text
         elif text.startswith('~'):
-            absPath = os.path.expanduser(dirname)
+            absPath = os.path.expanduser(text)
         else:  # relative path
             absPath = os.path.abspath(os.path.join(os.path.curdir, text))
         
