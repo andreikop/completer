@@ -82,7 +82,7 @@ class ListModel(QAbstractItemModel):
             elif itemType == 'currentDir':
                 return self._formatCurrentDir(item)
             elif itemType in ('file', 'directory'):
-                return self._formatListItem(item)
+                return self._formatPath(item)
             else:
                 assert False
         elif role == Qt.DecorationRole:
@@ -107,9 +107,13 @@ class ListModel(QAbstractItemModel):
         self._completion = completion
         self.modelReset.emit()
 
-    def _formatListItem(self, text):
+    def _formatPath(self, text):
         typedLen = self._completion.lastTypedSegmentLength()
-        return '<b>%s</b>%s' % (text[:typedLen], text[typedLen:])
+        typedLenPlusInline = typedLen + len(self._completion.inline())
+        return '<b>%s</b><u>%s</u>%s' % \
+            (text[:typedLen],
+             text[typedLen:typedLenPlusInline],
+             text[typedLenPlusInline:])
 
     def _formatError(self, text):
         return '<i>%s</i>' % text
