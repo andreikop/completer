@@ -212,6 +212,7 @@ class CommandConsole(QWidget):
         
         #self._list.hide()
         self._edit.setFocus()
+        self._tryToComplete()
 
     def _tryToComplete(self):
         text = self._edit.toPlainText()
