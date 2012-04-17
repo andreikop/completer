@@ -225,6 +225,9 @@ class Completion:
         self._dirs = []
         self._files = []
         self._error = None
+        
+        text = text.lstrip()
+        
         self._relative = text is None or \
                          (not text.startswith('/') and not text.startswith('~'))
         
@@ -233,9 +236,13 @@ class Completion:
         elif text.startswith('~'):
             absPath = os.path.expanduser(dirname)
         else:  # relative path
-            absPath = os.path.abspath(os.path.join(os.path.curdir, text)) + '/'
+            absPath = os.path.abspath(os.path.join(os.path.curdir, text))
         
-        self.path = os.path.normpath(os.path.dirname(absPath)) + '/'
+        if os.path.isdir(absPath):
+            absPath += '/'
+        
+        self.path = os.path.normpath(os.path.dirname(absPath))
+
         basename = os.path.basename(text)
         
         if text:
@@ -256,7 +263,7 @@ class Completion:
                 except OSError, ex:
                     self._error = unicode(str(ex), 'utf8')
             else:
-                self._error = 'No directory %s' % dirname
+                self._error = 'No directory %s' % self.path
         
         self._items = []
         if self._error:
