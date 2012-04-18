@@ -59,7 +59,7 @@ from PyQt4.QtGui import qApp, QFileSystemModel
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completion = Completion('')  # initial, empty
+        self._completion = Completion('', 0)  # initial, empty
         self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
@@ -154,8 +154,7 @@ class CompletableLineEdit(QTextEdit):
                 color = self.palette().color(QPalette.Base).name()
                 self.insertHtml('<font style="background-color: %s">%s</font>' % (color, self._inlineCompletion))
                 self._clearInlineCompletion()
-                if self.textCursor().atEnd():
-                    self.tryToComplete.emit()
+                self.tryToComplete.emit()
             return True
         else:
             return QTextEdit.event(self, event)
@@ -163,8 +162,7 @@ class CompletableLineEdit(QTextEdit):
     def keyPressEvent(self, event):
         self._clearInlineCompletion()
         QTextEdit.keyPressEvent(self, event)
-        if self.textCursor().atEnd():
-            self.tryToComplete.emit()
+        self.tryToComplete.emit()
     
     def mousePressEvent(self, event):
         self._clearInlineCompletion()
@@ -216,7 +214,7 @@ class CommandConsole(QWidget):
 
     def _tryToComplete(self):
         text = self._edit.toPlainText()
-        completion = Completion(text)
+        completion = Completion(text, self._edit.textCursor().position())
         inline = completion.inline()
         if inline:
             self._edit.setInlineCompletion(inline)
@@ -227,13 +225,24 @@ import os
 import os.path
 
 class Completion:
-    def __init__(self, text):
+    def __init__(self, text, pos):
         self._originalText = text
         self._dirs = []
         self._files = []
         self._error = None
         
-        text = text.lstrip()
+        # strip other words at left
+        leftSpace = text.rfind(' ', 0, pos)
+        if leftSpace > 0:
+            text = text[leftSpace + 1:]
+            pos -= (leftSpace + 1)
+        
+        # strip other words at right
+        rightSpace = text.find(' ', pos)
+        if rightSpace > 0:
+            text = text[:rightSpace]
+        
+        self._strippedText = text
         
         self._relative = text is None or \
                          (not text.startswith('/') and not text.startswith('~'))
@@ -245,7 +254,7 @@ class Completion:
         else:  # relative path
             absPath = os.path.abspath(os.path.join(os.path.curdir, text))
         
-        if os.path.isdir(absPath):
+        if os.path.isdir(absPath) and not absPath == '/':
             absPath += '/'
         
         self.path = os.path.normpath(os.path.dirname(absPath))
@@ -293,7 +302,7 @@ class Completion:
     def lastTypedSegmentLength(self):
         """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
         """
-        return len(os.path.split(self._originalText)[1])
+        return len(os.path.split(self._strippedText)[1])
     
     def _commonStart(self, a, b):
         for index, char in enumerate(a):
