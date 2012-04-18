@@ -247,25 +247,23 @@ class Completion:
         self._relative = text is None or \
                          (not text.startswith('/') and not text.startswith('~'))
         
-        if text.startswith('/'):
-            absPath = text
+        enterredDir = os.path.dirname(text)
+        enterredFile = os.path.basename(text)
+        
+        if enterredDir.startswith('/'):
+            pass
         elif text.startswith('~'):
-            absPath = os.path.expanduser(text)
+            enterredDir = os.path.expanduser(enterredDir)
         else:  # relative path
-            absPath = os.path.abspath(os.path.join(os.path.curdir, text))
+            enterredDir = os.path.abspath(os.path.join(os.path.curdir, enterredDir))
         
-        if os.path.isdir(absPath) and not absPath == '/':
-            absPath += '/'
-        
-        self.path = os.path.normpath(os.path.dirname(absPath))
+        self.path = os.path.normpath(enterredDir) + '/'
 
-        basename = os.path.basename(text)
-        
         if os.path.isdir(self.path):
             # filter matching
             try:
                 variants = [path for path in os.listdir(self.path) \
-                                if path.startswith(basename) and \
+                                if path.startswith(enterredFile) and \
                                    not path.startswith('.')]
                 
                 for variant in variants:
