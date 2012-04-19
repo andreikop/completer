@@ -8,50 +8,11 @@ from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyl
                         QStyle, QStyleOptionFrameV2, \
                         QTextCursor, QTextEdit, QTextOption, QListView, QVBoxLayout, QWidget
 
+import os
 import sys
 
-from PyQt4 import QtGui
-from PyQt4 import QtCore
-class HTMLDelegate(QtGui.QStyledItemDelegate):
-    #http://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt/1956781#1956781
-    def paint(self, painter, option, index):
-        options = QtGui.QStyleOptionViewItemV4(option)
-        self.initStyleOption(options,index)
-
-        style = QtGui.QApplication.style() if options.widget is None else options.widget.style()
-
-        doc = QtGui.QTextDocument()
-        doc.setDocumentMargin(1)
-        doc.setHtml(options.text)
-        #  bad long (multiline) strings processing doc.setTextWidth(options.rect.width())
-
-        options.text = ""
-        style.drawControl(QtGui.QStyle.CE_ItemViewItem, options, painter);
-
-        ctx = QtGui.QAbstractTextDocumentLayout.PaintContext()
-
-        # Highlighting text if item is selected
-        #if (optionV4.state & QStyle::State_Selected)
-            #ctx.palette.setColor(QPalette::Text, optionV4.palette.color(QPalette::Active, QPalette::HighlightedText));
-
-        textRect = style.subElementRect(QtGui.QStyle.SE_ItemViewItemText, options)
-        painter.save()
-        painter.translate(textRect.topLeft())
-        painter.setClipRect(textRect.translated(-textRect.topLeft()))
-        doc.documentLayout().draw(painter, ctx)
-
-        painter.restore()
-
-    def sizeHint(self, option, index):
-        options = QtGui.QStyleOptionViewItemV4(option)
-        self.initStyleOption(options,index)
-
-        doc = QtGui.QTextDocument()
-        doc.setDocumentMargin(1)
-        #  bad long (multiline) strings processing doc.setTextWidth(options.rect.width())
-        doc.setHtml(options.text)
-        return QtCore.QSize(doc.idealWidth(), doc.size().height())
-
+from htmldelegate import HTMLDelegate
+from pathcompleter import PathCompleter
 
 from PyQt4.QtCore import QAbstractItemModel, QModelIndex
 from PyQt4.QtGui import qApp, QFileSystemModel
@@ -59,7 +20,7 @@ from PyQt4.QtGui import qApp, QFileSystemModel
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completion = Completion('', 0)  # initial, empty
+        self._completion = PathCompleter('', 0)  # initial, empty
         self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
@@ -214,110 +175,11 @@ class CommandConsole(QWidget):
 
     def _tryToComplete(self):
         text = self._edit.toPlainText()
-        completion = Completion(text, self._edit.textCursor().position())
+        completion = PathCompleter(text, self._edit.textCursor().position())
         inline = completion.inline()
         if inline:
             self._edit.setInlineCompletion(inline)
         self._model.setCompletion(completion)
-
-
-import os
-import os.path
-
-class Completion:
-    def __init__(self, text, pos):
-        self._originalText = text
-        self._dirs = []
-        self._files = []
-        self._error = None
-        
-        # strip other words at left
-        leftSpace = text.rfind(' ', 0, pos)
-        if leftSpace > 0:
-            text = text[leftSpace + 1:]
-            pos -= (leftSpace + 1)
-        
-        # strip other words at right
-        rightSpace = text.find(' ', pos)
-        if rightSpace > 0:
-            text = text[:rightSpace]
-        
-        self._strippedText = text
-        
-        self._relative = text is None or \
-                         (not text.startswith('/') and not text.startswith('~'))
-        
-        enterredDir = os.path.dirname(text)
-        enterredFile = os.path.basename(text)
-        
-        if enterredDir.startswith('/'):
-            pass
-        elif text.startswith('~'):
-            enterredDir = os.path.expanduser(enterredDir)
-        else:  # relative path
-            enterredDir = os.path.abspath(os.path.join(os.path.curdir, enterredDir))
-        
-        self.path = os.path.normpath(enterredDir) + '/'
-
-        if os.path.isdir(self.path):
-            # filter matching
-            try:
-                variants = [path for path in os.listdir(self.path) \
-                                if path.startswith(enterredFile) and \
-                                   not path.startswith('.')]
-                
-                for variant in variants:
-                    if os.path.isdir(os.path.join(self.path, variant)):
-                        self._dirs.append(variant + '/')
-                    else:
-                        self._files.append(variant)
-                self._dirs.sort()
-                self._files.sort()
-            except OSError, ex:
-                self._error = unicode(str(ex), 'utf8')
-        else:
-            self._error = 'No directory %s' % self.path
-        
-        self._items = []
-        if self._error:
-            self._items.append(('error', self._error))
-        else:
-            self._items.append(('currentDir', self.path))
-            for dirPath in self._dirs:
-                dirPathNoSlash = os.path.split(dirPath)[0]
-                parDir, dirName = os.path.split(dirPathNoSlash)
-                self._items.append(('directory', dirName + '/'))
-            for filePath in self._files:
-                fileName = os.path.split(filePath)[1]
-                self._items.append(('file', fileName))
-
-    def count(self):
-        return len(self._items)
-    
-    def item(self, index):
-        return self._items[index]
-
-    def lastTypedSegmentLength(self):
-        """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
-        """
-        return len(os.path.split(self._strippedText)[1])
-    
-    def _commonStart(self, a, b):
-        for index, char in enumerate(a):
-            if len(b) <= index or b[index] != char:
-                return a[:index]
-        return a
-
-    def inline(self):
-        if self._error is not None:
-            return None
-        else:
-            if self._dirs or self._files:
-                commonPart = reduce(self._commonStart, self._dirs + self._files)
-                return commonPart[self.lastTypedSegmentLength():]
-            else:
-                return ''
-
 
 def main():
     app = QApplication(sys.argv)
