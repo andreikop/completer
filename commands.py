@@ -1,3 +1,5 @@
+import os.path
+
 from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, White, Word, nums
 
 from pathcompleter import PathCompleter
@@ -39,6 +41,12 @@ class CommandOpen:
     def completion(self, pos):
         return PathCompleter(self.path, pos - self.pathLocation)
 
+    def readyToExecute(self):
+        return os.path.isfile(os.path.expanduser(self.path))
+    
+    def execute(self):
+        print 'open file', self.path
+
 class CommandGotoLine:
     name = 'l'
     description = 'Go to line'
@@ -63,6 +71,12 @@ class CommandGotoLine:
 
     def completion(self, pos):
         return None
+
+    def readyToExecute(self):
+        return self.line is not None
+
+    def execute(self):
+        print 'goto', self.line
 
 commands = (CommandGotoLine, CommandOpen)
 

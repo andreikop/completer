@@ -29,6 +29,20 @@ class HelpCompleter:
     def inline(self):
         return None
 
+class ShowDescriptionCompleter:
+    def __init__(self, text):
+        self._text = text
+    
+    def rowCount(self):
+        return 1
+    
+    def item(self, row):
+        return self._text
+    
+    def inline(self):
+        return None
+
+
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
@@ -65,6 +79,7 @@ class ListModel(QAbstractItemModel):
 
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()
+    enterPressed = pyqtSignal()
     def __init__(self, *args):
         QTextEdit.__init__(self, *args)
         self.setTabChangesFocus(True)
@@ -100,7 +115,10 @@ class CompletableLineEdit(QTextEdit):
     
     def keyPressEvent(self, event):
         self._clearInlineCompletion()
-        QTextEdit.keyPressEvent(self, event)
+        if event.key() in (Qt.Key_Enter, Qt.Key_Return):
+            self.enterPressed.emit()
+        else:
+            QTextEdit.keyPressEvent(self, event)
         self.tryToComplete.emit()
     
     def mousePressEvent(self, event):
@@ -145,6 +163,7 @@ class CommandConsole(QWidget):
         self._edit = CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
         self._edit.tryToComplete.connect(self._tryToComplete)
+        self._edit.enterPressed.connect(self._enterPressed)
         self.setFocusProxy(self._edit)
 
         self._edit.setFocus()
@@ -162,10 +181,18 @@ class CommandConsole(QWidget):
                 inline = completer.inline()
                 if inline:
                     self._edit.setInlineCompletion(inline)
+            else:
+                completer = ShowDescriptionCompleter(command.description)
         else:
             completer = HelpCompleter(commands.commands)
 
         self._model.setCompleter(completer)
+    
+    def _enterPressed(self):
+        text = self._edit.toPlainText()
+        command = commands.parseCommand(text)
+        if command is not None and command.readyToExecute():
+            command.execute()
 
 def main():
     app = QApplication(sys.argv)
