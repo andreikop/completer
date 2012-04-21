@@ -1,11 +1,12 @@
-from pyparsing import CharsNotIn, Keyword, Literal, Optional, Or, ParseException, White, Word, nums
+from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, White, Word, nums
 
 from pathcompleter import PathCompleter
 
-ws = White().suppress()
-optWs = Optional(ws).suppress()
-
 class CommandOpen:
+    
+    name = 'f'
+    description = 'Open file'
+    
     def __init__(self, pathLocation, path):
         self.path = path
         self.pathLocation = pathLocation
@@ -19,7 +20,7 @@ class CommandOpen:
         path.setParseAction(attachLocation)
         longPath = CharsNotIn(" \t", min=2)("path")
         longPath.setParseAction(attachLocation)
-        slashPath = Literal('/') + Optional(CharsNotIn(" \t"))("path")
+        slashPath = Combine(Literal('/') + Optional(CharsNotIn(" \t")))("path")
         slashPath.setParseAction(attachLocation)
 
         pat = (Literal('f ') + Optional(path)) ^ longPath ^ slashPath
@@ -39,6 +40,8 @@ class CommandOpen:
         return PathCompleter(self.path, pos - self.pathLocation)
 
 class CommandGotoLine:
+    name = 'l'
+    description = 'Go to line'
     def __init__(self, line):
         self.line = line
     
@@ -61,9 +64,10 @@ class CommandGotoLine:
     def completion(self, pos):
         return None
 
+commands = (CommandGotoLine, CommandOpen)
+
 def parseCommand(text):
-    commands = (CommandGotoLine, CommandOpen)
-    
+    optWs = Optional(White()).suppress()
     pattern = optWs + Or([cmd.pattern() for cmd in commands]) + optWs
     try:
         res = pattern.parseString(text)

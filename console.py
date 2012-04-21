@@ -15,13 +15,24 @@ from htmldelegate import HTMLDelegate
 import commands
 
 from PyQt4.QtCore import QAbstractItemModel, QModelIndex
-from PyQt4.QtGui import qApp, QFileSystemModel
+
+class HelpCompleter:
+    def __init__(self, commands):
+        self._commands = commands
+    
+    def rowCount(self):
+        return len(self._commands)
+    
+    def item(self, row):
+        return '<b>%s</b> - %s' % (self._commands[row].name, self._commands[row].description)
+    
+    def inline(self):
+        return None
 
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self._completer = None
-        self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
         return self.createIndex(row, column)
@@ -30,74 +41,27 @@ class ListModel(QAbstractItemModel):
         return QModelIndex()
     
     def rowCount(self, index):
+        if index.isValid():
+            return 0
         if self._completer is None:
             return 0
         
-        return self._completer.count()
+        return self._completer.rowCount()
     
     def columnCount(self, index):
-        return 2
+        return 1
     
     def data(self, index, role):
         if self._completer is None:
-            return 0
-        
-        itemType, item = self._completer.item(index.row())
+            return None
         if role == Qt.DisplayRole:
-            if itemType == 'error':
-                return self._formatError(item)
-            elif itemType == 'currentDir':
-                return self._formatCurrentDir(item)
-            elif itemType in ('file', 'directory'):
-                return self._formatPath(item)
-            elif itemType == 'message':
-                return self._formatMessage(item)
-            else:
-                assert False
-        elif role == Qt.DecorationRole:
-            if itemType == 'error':
-                return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
-            elif itemType == 'currentDir':
-                return None
-            elif itemType in ('file', 'directory'):
-                index = self._fsModel.index(os.path.join(self._completer.path, item))
-                return self._fsModel.data(index, role)
-            
+            return self._completer.item(index.row())
         return None
-    
-    def flags(self, index):
-        if self._completer is None:
-            return 0
-        
-        retVal = QAbstractItemModel.flags(self, index)
-        itemType, item = self._completer.item(index.row())
-        if itemType in ('error', 'currentDir'):
-            retVal &= ~Qt.ItemIsSelectable  # clear flag
-        return retVal
     
     def setCompleter(self, completer):
         self._completer = completer
         self.modelReset.emit()
 
-    def _formatPath(self, text):
-        typedLen = self._completer.lastTypedSegmentLength()
-        typedLenPlusInline = typedLen + len(self._completer.inline())
-        return '<b>%s</b><u>%s</u>%s' % \
-            (text[:typedLen],
-             text[typedLen:typedLenPlusInline],
-             text[typedLenPlusInline:])
-
-    def _formatError(self, text):
-        return '<i>%s</i>' % text
-    
-    def _formatCurrentDir(self, text):
-        return '<font style="background-color: %s; color: %s">%s</font>' % \
-                (qApp.palette().color(QPalette.Window).name(),
-                 qApp.palette().color(QPalette.WindowText).name(),
-                 text)
-    
-    def _formatMessage(self, text):
-        return '<i>%s</i>' % text
 
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()
@@ -172,18 +136,17 @@ class CommandConsole(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(1)
         
-        self._list = QListView(self)
+        self._table = QListView(self)
         self._model = ListModel()
-        self._list.setModel(self._model)
-        self._list.setItemDelegate(HTMLDelegate())
-        self.layout().addWidget(self._list)
+        self._table.setModel(self._model)
+        self._table.setItemDelegate(HTMLDelegate())
+        self.layout().addWidget(self._table)
         
         self._edit = CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
         self._edit.tryToComplete.connect(self._tryToComplete)
         self.setFocusProxy(self._edit)
-        
-        #self._list.hide()
+
         self._edit.setFocus()
         self._tryToComplete()
 
@@ -193,13 +156,15 @@ class CommandConsole(QWidget):
         
         command = commands.parseCommand(text)
         if command is not None:
-                completer = command.completion(self._edit.textCursor().position())
-        
-        if completer is not None:
-            inline = completer.inline()
-            if inline:
-                self._edit.setInlineCompletion(inline)
-        
+            completer = command.completion(self._edit.textCursor().position())
+
+            if completer is not None:
+                inline = completer.inline()
+                if inline:
+                    self._edit.setInlineCompletion(inline)
+        else:
+            completer = HelpCompleter(commands.commands)
+
         self._model.setCompleter(completer)
 
 def main():

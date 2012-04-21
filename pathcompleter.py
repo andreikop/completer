@@ -1,3 +1,4 @@
+from PyQt4.QtGui import qApp, QPalette
 
 import os
 import os.path
@@ -32,7 +33,6 @@ class PathCompleter:
                 variants = [path for path in os.listdir(self.path) \
                                 if path.startswith(enterredFile) and \
                                    not path.startswith('.')]
-                
                 for variant in variants:
                     if os.path.isdir(os.path.join(self.path, variant)):
                         self._dirs.append(variant + '/')
@@ -47,28 +47,45 @@ class PathCompleter:
         
         self._items = []
         if self._error:
-            self._items.append(('error', self._error))
+            self._items.append('<font color=red>%s</font>' % self._error)
         else:
-            self._items.append(('currentDir', self.path))
+            self._items.append(self._formatCurrentDir(self.path))
             if self._dirs or self._files:
                 for dirPath in self._dirs:
                     dirPathNoSlash = os.path.split(dirPath)[0]
                     parDir, dirName = os.path.split(dirPathNoSlash)
-                    self._items.append(('directory', dirName + '/'))
+                    self._items.append(self._formatPath(dirName + '/'))
                 for filePath in self._files:
                     fileName = os.path.split(filePath)[1]
-                    self._items.append(('file', fileName))
+                    self._items.append(fileName)
             else:
-                self._items.append(('message', 'No matching files'),)
+                self._items.append('<i>No matching files</i>')
 
-    def count(self):
+    def _formatPath(self, text):
+        typedLen = self._lastTypedSegmentLength()
+        typedLenPlusInline = typedLen + len(self.inline())
+        return '<b>%s</b><u>%s</u>%s' % \
+            (text[:typedLen],
+             text[typedLen:typedLenPlusInline],
+             text[typedLenPlusInline:])
+
+    def _formatCurrentDir(self, text):
+        return '<font style="background-color: %s; color: %s">%s</font>' % \
+                (qApp.palette().color(QPalette.Window).name(),
+                 qApp.palette().color(QPalette.WindowText).name(),
+                 text)
+
+    def rowCount(self):
+        return len(self._items)
+    
+    def columnCount(self):
         return len(self._items)
     
     def item(self, index):
         return self._items[index]
 
-    def lastTypedSegmentLength(self):
-        """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
+    def _lastTypedSegmentLength(self):
+        """For /home/a/Docu _lastTypedSegmentLength() is len("Docu")
         """
         return len(os.path.split(self._originalText)[1])
     
@@ -84,7 +101,9 @@ class PathCompleter:
         else:
             if self._dirs or self._files:
                 commonPart = reduce(self._commonStart, self._dirs + self._files)
-                return commonPart[self.lastTypedSegmentLength():]
+                return commonPart[self._lastTypedSegmentLength():]
             else:
                 return ''
 
+    def columnCount(self):
+        return 1
