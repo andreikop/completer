@@ -72,6 +72,11 @@ class ListModel(QAbstractItemModel):
             return self._completer.item(index.row())
         return None
     
+    def flags(self, index):
+        retVal = QAbstractItemModel.flags(self, index)
+        retVal &= ~Qt.ItemIsSelectable  # clear flag
+        return retVal
+    
     def setCompleter(self, completer):
         self._completer = completer
         self.modelReset.emit()
