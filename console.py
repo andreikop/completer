@@ -50,6 +50,8 @@ class ListModel(QAbstractItemModel):
                 return self._formatCurrentDir(item)
             elif itemType in ('file', 'directory'):
                 return self._formatPath(item)
+            elif itemType == 'message':
+                return self._formatMessage(item)
             else:
                 assert False
         elif role == Qt.DecorationRole:
@@ -93,6 +95,9 @@ class ListModel(QAbstractItemModel):
                 (qApp.palette().color(QPalette.Window).name(),
                  qApp.palette().color(QPalette.WindowText).name(),
                  text)
+    
+    def _formatMessage(self, text):
+        return '<i>%s</i>' % text
 
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()

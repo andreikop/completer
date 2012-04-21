@@ -50,13 +50,16 @@ class PathCompleter:
             self._items.append(('error', self._error))
         else:
             self._items.append(('currentDir', self.path))
-            for dirPath in self._dirs:
-                dirPathNoSlash = os.path.split(dirPath)[0]
-                parDir, dirName = os.path.split(dirPathNoSlash)
-                self._items.append(('directory', dirName + '/'))
-            for filePath in self._files:
-                fileName = os.path.split(filePath)[1]
-                self._items.append(('file', fileName))
+            if self._dirs or self._files:
+                for dirPath in self._dirs:
+                    dirPathNoSlash = os.path.split(dirPath)[0]
+                    parDir, dirName = os.path.split(dirPathNoSlash)
+                    self._items.append(('directory', dirName + '/'))
+                for filePath in self._files:
+                    fileName = os.path.split(filePath)[1]
+                    self._items.append(('file', fileName))
+            else:
+                self._items.append(('message', 'No matching files'),)
 
     def count(self):
         return len(self._items)
