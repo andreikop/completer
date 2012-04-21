@@ -9,19 +9,6 @@ class PathCompleter:
         self._files = []
         self._error = None
         
-        # strip other words at left
-        leftSpace = text.rfind(' ', 0, pos)
-        if leftSpace > 0:
-            text = text[leftSpace + 1:]
-            pos -= (leftSpace + 1)
-        
-        # strip other words at right
-        rightSpace = text.find(' ', pos)
-        if rightSpace > 0:
-            text = text[:rightSpace]
-        
-        self._strippedText = text
-        
         self._relative = text is None or \
                          (not text.startswith('/') and not text.startswith('~'))
         
@@ -35,7 +22,9 @@ class PathCompleter:
         else:  # relative path
             enterredDir = os.path.abspath(os.path.join(os.path.curdir, enterredDir))
         
-        self.path = os.path.normpath(enterredDir) + '/'
+        self.path = os.path.normpath(enterredDir)
+        if self.path != '/':
+            self.path += '/'
 
         if os.path.isdir(self.path):
             # filter matching
@@ -78,7 +67,7 @@ class PathCompleter:
     def lastTypedSegmentLength(self):
         """For /home/a/Docu lastTypedSegmentLength() is len("Docu")
         """
-        return len(os.path.split(self._strippedText)[1])
+        return len(os.path.split(self._originalText)[1])
     
     def _commonStart(self, a, b):
         for index, char in enumerate(a):

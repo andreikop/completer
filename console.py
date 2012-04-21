@@ -12,7 +12,7 @@ import os
 import sys
 
 from htmldelegate import HTMLDelegate
-from pathcompleter import PathCompleter
+import commands
 
 from PyQt4.QtCore import QAbstractItemModel, QModelIndex
 from PyQt4.QtGui import qApp, QFileSystemModel
@@ -20,7 +20,7 @@ from PyQt4.QtGui import qApp, QFileSystemModel
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completion = PathCompleter('', 0)  # initial, empty
+        self._completer = None
         self._fsModel = QFileSystemModel()
 
     def index(self, row, column, parent):
@@ -30,13 +30,19 @@ class ListModel(QAbstractItemModel):
         return QModelIndex()
     
     def rowCount(self, index):
-        return self._completion.count()
+        if self._completer is None:
+            return 0
+        
+        return self._completer.count()
     
     def columnCount(self, index):
         return 2
     
     def data(self, index, role):
-        itemType, item = self._completion.item(index.row())
+        if self._completer is None:
+            return 0
+        
+        itemType, item = self._completer.item(index.row())
         if role == Qt.DisplayRole:
             if itemType == 'error':
                 return self._formatError(item)
@@ -52,25 +58,28 @@ class ListModel(QAbstractItemModel):
             elif itemType == 'currentDir':
                 return None
             elif itemType in ('file', 'directory'):
-                index = self._fsModel.index(os.path.join(self._completion.path, item))
+                index = self._fsModel.index(os.path.join(self._completer.path, item))
                 return self._fsModel.data(index, role)
             
         return None
     
     def flags(self, index):
+        if self._completer is None:
+            return 0
+        
         retVal = QAbstractItemModel.flags(self, index)
-        itemType, item = self._completion.item(index.row())
+        itemType, item = self._completer.item(index.row())
         if itemType in ('error', 'currentDir'):
             retVal &= ~Qt.ItemIsSelectable  # clear flag
         return retVal
     
-    def setCompletion(self, completion):
-        self._completion = completion
+    def setCompleter(self, completer):
+        self._completer = completer
         self.modelReset.emit()
 
     def _formatPath(self, text):
-        typedLen = self._completion.lastTypedSegmentLength()
-        typedLenPlusInline = typedLen + len(self._completion.inline())
+        typedLen = self._completer.lastTypedSegmentLength()
+        typedLenPlusInline = typedLen + len(self._completer.inline())
         return '<b>%s</b><u>%s</u>%s' % \
             (text[:typedLen],
              text[typedLen:typedLenPlusInline],
@@ -175,11 +184,18 @@ class CommandConsole(QWidget):
 
     def _tryToComplete(self):
         text = self._edit.toPlainText()
-        completion = PathCompleter(text, self._edit.textCursor().position())
-        inline = completion.inline()
-        if inline:
-            self._edit.setInlineCompletion(inline)
-        self._model.setCompletion(completion)
+        completer = None
+        
+        command = commands.parseCommand(text)
+        if command is not None:
+                completer = command.completion(self._edit.textCursor().position())
+        
+        if completer is not None:
+            inline = completer.inline()
+            if inline:
+                self._edit.setInlineCompletion(inline)
+        
+        self._model.setCompleter(completer)
 
 def main():
     app = QApplication(sys.argv)
