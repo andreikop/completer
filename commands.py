@@ -1,6 +1,7 @@
 import os.path
 
-from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, Suppress, White, Word, nums
+from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, \
+                     StringEnd, Suppress, White, Word, nums
 
 from pathcompleter import PathCompleter
 
@@ -92,7 +93,7 @@ commands = (CommandGotoLine, CommandOpen)
 
 def parseCommand(text):
     optWs = Optional(White()).suppress()
-    pattern = optWs + Or([cmd.pattern() for cmd in commands]) + optWs
+    pattern = optWs + Or([cmd.pattern() for cmd in commands]) + optWs + StringEnd()
     try:
         res = pattern.parseString(text)
         return res[0]
