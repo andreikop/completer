@@ -4,13 +4,15 @@ from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, Parse
 
 from pathcompleter import PathCompleter
 
+
 class CommandOpen:
     
-    description = 'f [PATH] - Open file'
+    description = 'f PATH [LINE] - Open file'
     
-    def __init__(self, pathLocation, path):
+    def __init__(self, pathLocation, path, line):
         self.path = path
         self.pathLocation = pathLocation
+        self.line = line
     
     @staticmethod
     def pattern():
@@ -24,7 +26,8 @@ class CommandOpen:
         slashPath = Combine(Literal('/') + Optional(CharsNotIn(" \t")))("path")
         slashPath.setParseAction(attachLocation)
 
-        pat = (Literal('f ') + Suppress(Optional(White())) + Optional(path)) ^ longPath ^ slashPath
+        pat = ((Literal('f ') + Optional(White()) + Optional(path)) ^ longPath ^ slashPath) + \
+                    Optional(White() + Word(nums)("line"))
         pat.leaveWhitespace()
         pat.setParseAction(CommandOpen.create)
         return pat
@@ -35,7 +38,13 @@ class CommandOpen:
             pathLocation, path = tocs.path
         else:
             pathLocation, path = 0, ''
-        return [CommandOpen(pathLocation, path)]
+        
+        if tocs.line:
+            line = int(tocs.line)
+        else:
+            line = None
+        
+        return [CommandOpen(pathLocation, path, line)]
     
     def completion(self, pos):
         return PathCompleter(self.path, pos - self.pathLocation)
@@ -44,10 +53,10 @@ class CommandOpen:
         return os.path.isfile(os.path.expanduser(self.path))
     
     def execute(self):
-        print 'open file', self.path
+        print 'open file', self.path, self.line
 
 class CommandGotoLine:
-    description = 'l [NUMBER] - Go to line'
+    description = 'l [LINE] - Go to line'
     def __init__(self, line):
         self.line = line
     
