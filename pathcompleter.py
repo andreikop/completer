@@ -57,7 +57,7 @@ class PathCompleter:
                     self._items.append(self._formatPath(dirName + '/'))
                 for filePath in self._files:
                     fileName = os.path.split(filePath)[1]
-                    self._items.append(fileName)
+                    self._items.append(self._formatPath(fileName))
             else:
                 self._items.append('<i>No matching files</i>')
 
