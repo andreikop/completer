@@ -24,7 +24,7 @@ class HelpCompleter:
         return len(self._commands)
     
     def item(self, row):
-        return '<b>%s</b> - %s' % (self._commands[row].name, self._commands[row].description)
+        return self._commands[row].description
     
     def inline(self):
         return None
