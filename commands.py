@@ -47,7 +47,10 @@ class CommandOpen:
         return [CommandOpen(pathLocation, path, line)]
     
     def completion(self, pos):
-        return PathCompleter(self.path, pos - self.pathLocation)
+        if pos == self.pathLocation + len(self.path):
+            return PathCompleter(self.path, pos - self.pathLocation)
+        else:
+            return None
 
     def readyToExecute(self):
         return os.path.isfile(os.path.expanduser(self.path))
