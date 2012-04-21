@@ -1,6 +1,6 @@
 import os.path
 
-from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, White, Word, nums
+from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, Suppress, White, Word, nums
 
 from pathcompleter import PathCompleter
 
@@ -24,7 +24,7 @@ class CommandOpen:
         slashPath = Combine(Literal('/') + Optional(CharsNotIn(" \t")))("path")
         slashPath.setParseAction(attachLocation)
 
-        pat = (Literal('f ') + Optional(path)) ^ longPath ^ slashPath
+        pat = (Literal('f ') + Suppress(Optional(White())) + Optional(path)) ^ longPath ^ slashPath
         pat.leaveWhitespace()
         pat.setParseAction(CommandOpen.create)
         return pat
@@ -54,7 +54,7 @@ class CommandGotoLine:
     @staticmethod
     def pattern():
         line = Word(nums)("line")
-        pat = (Literal('l ') + Optional(line)) ^ line
+        pat = (Literal('l ') + Suppress(Optional(White())) + Optional(line)) ^ line
         pat.leaveWhitespace()
         pat.setParseAction(CommandGotoLine.create)
         return pat
