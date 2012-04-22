@@ -85,6 +85,8 @@ class ListModel(QAbstractItemModel):
 class CompletableLineEdit(QTextEdit):
     tryToComplete = pyqtSignal()
     enterPressed = pyqtSignal()
+    historyPrevious = pyqtSignal()
+    historyNext = pyqtSignal()
     def __init__(self, *args):
         QTextEdit.__init__(self, *args)
         self.setTabChangesFocus(True)
@@ -122,6 +124,10 @@ class CompletableLineEdit(QTextEdit):
         self._clearInlineCompletion()
         if event.key() in (Qt.Key_Enter, Qt.Key_Return):
             self.enterPressed.emit()
+        elif event.key() == Qt.Key_Up:
+            self.historyPrevious.emit()
+        elif event.key() == Qt.Key_Down:
+            self.historyNext.emit()
         else:
             QTextEdit.keyPressEvent(self, event)
         self.tryToComplete.emit()
@@ -148,12 +154,22 @@ class CompletableLineEdit(QTextEdit):
         cursor.setPosition(pos)
         self.setTextCursor(cursor)
     
+    def setPlainText(self, text):
+        self.setInlineCompletion('')
+        QTextEdit.setPlainText(self, text)
+        self.moveCursor(QTextCursor.End)
+    
     def text(self):
-        return self.toPlainText()
+        return self.toPlainText().strip()
+
 
 class CommandConsole(QWidget):
     def __init__(self, *args):
         QWidget.__init__(self, *args)
+        
+        self._history = ['']
+        self._historyIndex = 0
+        self._incompleteCommand = None
         
         self.setLayout(QVBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
@@ -168,14 +184,16 @@ class CommandConsole(QWidget):
         self._edit = CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
         self._edit.tryToComplete.connect(self._tryToComplete)
-        self._edit.enterPressed.connect(self._enterPressed)
+        self._edit.enterPressed.connect(self._onEnterPressed)
+        self._edit.historyPrevious.connect(self._onHistoryPrevious)
+        self._edit.historyNext.connect(self._onHistoryNext)
         self.setFocusProxy(self._edit)
 
         self._edit.setFocus()
         self._tryToComplete()
 
     def _tryToComplete(self):
-        text = self._edit.toPlainText()
+        text = self._edit.text()
         completer = None
         
         command = commands.parseCommand(text)
@@ -193,11 +211,32 @@ class CommandConsole(QWidget):
 
         self._model.setCompleter(completer)
     
-    def _enterPressed(self):
-        text = self._edit.toPlainText()
+    def _onEnterPressed(self):
+        text = self._edit.text().strip()
         command = commands.parseCommand(text)
         if command is not None and command.readyToExecute():
             command.execute()
+            self._history[-1] = text
+            if len(self._history) > 1 and \
+               self._history[-1] == self._history[-2]:
+                   self._history = self._history[:-1]  # if the last command repeats, remove duplicate
+            self._history.append('')  # new edited command
+            self._historyIndex = len(self._history) - 1
+            self._edit.clear()
+    
+    def _onHistoryPrevious(self):
+        if self._historyIndex == len(self._history) - 1:  # save edited command
+            self._history[self._historyIndex] = self._edit.text()
+        
+        if self._historyIndex > 0:
+            self._historyIndex -= 1
+            self._edit.setPlainText(self._history[self._historyIndex])
+    
+    def _onHistoryNext(self):
+        if self._historyIndex < len(self._history) - 1:
+            self._historyIndex += 1
+            self._edit.setPlainText(self._history[self._historyIndex])
+
 
 def main():
     app = QApplication(sys.argv)
@@ -207,3 +246,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
