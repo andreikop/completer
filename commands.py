@@ -8,7 +8,7 @@ from pathcompleter import PathCompleter
 
 class CommandOpen:
     
-    description = 'f PATH [LINE] - Open file'
+    description = '[f] PATH [LINE] - Open file'
     
     def __init__(self, pathLocation, path, line):
         self.path = path
@@ -60,7 +60,7 @@ class CommandOpen:
         print 'open file', self.path, self.line
 
 class CommandGotoLine:
-    description = 'l [LINE] - Go to line'
+    description = '[l] [LINE] - Go to line'
     def __init__(self, line):
         self.line = line
     
