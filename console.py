@@ -181,9 +181,6 @@ class CompletableLineEdit(QTextEdit):
         self.setInlineCompletion('')
         QTextEdit.setPlainText(self, text)
         self.moveCursor(QTextCursor.End)
-    
-    def text(self):
-        return self.toPlainText().strip()
 
 
 class CommandConsole(QWidget):
@@ -218,7 +215,7 @@ class CommandConsole(QWidget):
         self._tryToComplete()
 
     def _tryToComplete(self):
-        text = self._edit.text()
+        text = self._edit.toPlainText()
         completer = None
         
         command = commands.parseCommand(text)
@@ -239,13 +236,13 @@ class CommandConsole(QWidget):
         self._table.setColumnWidth(0, self._table.columnWidth(0) + 20)  # 20 px spacing between columns
     
     def _onEnterPressed(self):
-        text = self._edit.text().strip()
+        text = self._edit.toPlainText().strip()
         command = commands.parseCommand(text)
         if command is not None and command.readyToExecute():
             command.execute()
             self._history[-1] = text
             if len(self._history) > 1 and \
-               self._history[-1] == self._history[-2]:
+               self._history[-1].strip() == self._history[-2].strip():
                    self._history = self._history[:-1]  # if the last command repeats, remove duplicate
             self._history.append('')  # new edited command
             self._historyIndex = len(self._history) - 1
@@ -253,7 +250,7 @@ class CommandConsole(QWidget):
     
     def _onHistoryPrevious(self):
         if self._historyIndex == len(self._history) - 1:  # save edited command
-            self._history[self._historyIndex] = self._edit.text()
+            self._history[self._historyIndex] = self._edit.toPlainText()
         
         if self._historyIndex > 0:
             self._historyIndex -= 1
