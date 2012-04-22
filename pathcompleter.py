@@ -79,10 +79,10 @@ class PathCompleter:
         return len(self._items)
     
     def columnCount(self):
-        return len(self._items)
+        return 1
     
-    def item(self, index):
-        return self._items[index]
+    def item(self, row, column):
+        return self._items[row]
 
     def _lastTypedSegmentLength(self):
         """For /home/a/Docu _lastTypedSegmentLength() is len("Docu")

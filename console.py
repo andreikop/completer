@@ -6,7 +6,7 @@ sip.setapi('QString', 2)
 from PyQt4.QtCore import pyqtSignal, QSize, Qt
 from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
                         QStyle, QStyleOptionFrameV2, \
-                        QTextCursor, QTextEdit, QTextOption, QListView, QVBoxLayout, QWidget
+                        QTextCursor, QTextEdit, QTextOption, QTreeView, QVBoxLayout, QWidget
 
 import os
 import sys
@@ -23,8 +23,14 @@ class HelpCompleter:
     def rowCount(self):
         return len(self._commands)
     
-    def item(self, row):
-        return self._commands[row].description
+    def columnCount(self):
+        return 2
+    
+    def item(self, row, column):
+        if column == 0:
+            return self._commands[row].signature
+        else:
+            return self._commands[row].description
     
     def inline(self):
         return None
@@ -63,13 +69,15 @@ class ListModel(QAbstractItemModel):
         return self._completer.rowCount()
     
     def columnCount(self, index):
-        return 1
+        if self._completer is None:
+            return 0
+        return self._completer.columnCount()
     
     def data(self, index, role):
         if self._completer is None:
             return None
         if role == Qt.DisplayRole:
-            return self._completer.item(index.row())
+            return self._completer.item(index.row(), index.column())
         return None
     
     def flags(self, index):
@@ -175,10 +183,12 @@ class CommandConsole(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(1)
         
-        self._table = QListView(self)
+        self._table = QTreeView(self)
         self._model = ListModel()
         self._table.setModel(self._model)
         self._table.setItemDelegate(HTMLDelegate())
+        self._table.setRootIsDecorated(False)
+        self._table.setHeaderHidden(True)
         self.layout().addWidget(self._table)
         
         self._edit = CompletableLineEdit(self)
