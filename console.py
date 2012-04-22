@@ -39,14 +39,21 @@ class HelpCompleter:
         return None
 
 class ShowDescriptionCompleter:
-    def __init__(self, text):
-        self._text = text
+    def __init__(self, signature, description):
+        self._signature = signature
+        self._description = description
     
     def rowCount(self):
         return 1
     
+    def columnCount(self):
+        return 2
+    
     def text(self, row, column):
-        return self._text
+        if column == 0:
+            return self._signature
+        else:
+            return self._description
     
     def icon(self, row, column):
         return None
@@ -223,7 +230,7 @@ class CommandConsole(QWidget):
                 if inline:
                     self._edit.setInlineCompletion(inline)
             else:
-                completer = ShowDescriptionCompleter(command.description)
+                completer = ShowDescriptionCompleter(command.signature, command.description)
         else:
             completer = HelpCompleter(commands.commands)
 
