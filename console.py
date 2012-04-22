@@ -26,11 +26,14 @@ class HelpCompleter:
     def columnCount(self):
         return 2
     
-    def item(self, row, column):
+    def text(self, row, column):
         if column == 0:
             return self._commands[row].signature
         else:
             return self._commands[row].description
+    
+    def icon(self, row, column):
+        return None
     
     def inline(self):
         return None
@@ -42,9 +45,12 @@ class ShowDescriptionCompleter:
     def rowCount(self):
         return 1
     
-    def item(self, row):
+    def text(self, row, column):
         return self._text
     
+    def icon(self, row, column):
+        return None
+
     def inline(self):
         return None
 
@@ -77,7 +83,9 @@ class ListModel(QAbstractItemModel):
         if self._completer is None:
             return None
         if role == Qt.DisplayRole:
-            return self._completer.item(index.row(), index.column())
+            return self._completer.text(index.row(), index.column())
+        elif role == Qt.DecorationRole:
+            return self._completer.icon(index.row(), index.column())
         return None
     
     def flags(self, index):
@@ -220,6 +228,8 @@ class CommandConsole(QWidget):
             completer = HelpCompleter(commands.commands)
 
         self._model.setCompleter(completer)
+        self._table.resizeColumnToContents(0)
+        self._table.setColumnWidth(0, self._table.columnWidth(0) + 20)  # 20 px spacing between columns
     
     def _onEnterPressed(self):
         text = self._edit.text().strip()

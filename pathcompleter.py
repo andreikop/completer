@@ -1,7 +1,10 @@
-from PyQt4.QtGui import qApp, QPalette
+from PyQt4.QtCore import Qt
+from PyQt4.QtGui import qApp, QFileSystemModel, QPalette, QStyle
 
 import os
 import os.path
+
+_fsModel = QFileSystemModel()
 
 class PathCompleter:
     def __init__(self, text, pos):
@@ -45,21 +48,25 @@ class PathCompleter:
         else:
             self._error = 'No directory %s' % self.path
         
-        self._items = []
+        self._texts = []
+        self._icons = []
         if self._error:
-            self._items.append('<font color=red>%s</font>' % self._error)
+            self._texts.append('<font color=red>%s</font>' % self._error)
+            self._icons.append(qApp.style().standardIcon(QStyle.SP_MessageBoxCritical))
         else:
-            self._items.append(self._formatCurrentDir(self.path))
+            self._texts.append(self._formatCurrentDir(self.path))
+            self._icons.append(None)
             if self._dirs or self._files:
                 for dirPath in self._dirs:
                     dirPathNoSlash = os.path.split(dirPath)[0]
                     parDir, dirName = os.path.split(dirPathNoSlash)
-                    self._items.append(self._formatPath(dirName + '/'))
+                    self._texts.append(self._formatPath(dirName + '/'))
                 for filePath in self._files:
                     fileName = os.path.split(filePath)[1]
-                    self._items.append(self._formatPath(fileName))
+                    self._texts.append(self._formatPath(fileName))
             else:
-                self._items.append('<i>No matching files</i>')
+                self._texts.append('<i>No matching files</i>')
+                self._icons.append(None)
 
     def _formatPath(self, text):
         typedLen = self._lastTypedSegmentLength()
@@ -76,13 +83,29 @@ class PathCompleter:
                  text)
 
     def rowCount(self):
-        return len(self._items)
+        return len(self._texts)
     
     def columnCount(self):
         return 1
     
-    def item(self, row, column):
-        return self._items[row]
+    def text(self, row, column):
+        return self._texts[row]
+
+    def icon(self, row, column):
+        if row < len(self._icons):
+            return self._icons[row]
+        else:
+            dirOrFileName = ''
+            
+            if row - 1 < len(self._dirs):
+                dirOrFileName = self._dirs[row - 1]
+            elif row - 1 - len(self._dirs) < len(self._files):
+                dirOrFileName = self._files[row - 1 - len(self._dirs)]
+            
+            if dirOrFileName:
+                index = _fsModel.index(os.path.join(self.path, dirOrFileName))
+                return _fsModel.data(index, Qt.DecorationRole)
+        return None
 
     def _lastTypedSegmentLength(self):
         """For /home/a/Docu _lastTypedSegmentLength() is len("Docu")
