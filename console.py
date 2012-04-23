@@ -225,6 +225,7 @@ class CommandConsole(QWidget):
         if inlineForRow is not None:
             self._edit.insertPlainText(inlineForRow)
             self._updateCompletion()
+            self._edit.setFocus()
             self._onEnterPressed()
 
     def _updateCompletion(self):
