@@ -272,8 +272,9 @@ class Locator(QWidget):
             completer = _HelpCompleter(self._availableCommands())
 
         self._model.setCompleter(completer)
-        self._table.resizeColumnToContents(0)
-        self._table.setColumnWidth(0, self._table.columnWidth(0) + 20)  # 20 px spacing between columns
+        if completer.columnCount() > 1:
+            self._table.resizeColumnToContents(0)
+            self._table.setColumnWidth(0, self._table.columnWidth(0) + 20)  # 20 px spacing between columns
     
     def _onEnterPressed(self):
         text = self._edit.toPlainText().strip()
