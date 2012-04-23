@@ -72,23 +72,6 @@ class HelpCompleter(AbstractCompleter):
         else:
             return self._commands[row].description
 
-class ShowDescriptionCompleter:
-    def __init__(self, signature, description):
-        self._signature = signature
-        self._description = description
-    
-    def rowCount(self):
-        return 1
-    
-    def columnCount(self):
-        return 2
-    
-    def text(self, row, column):
-        if column == 0:
-            return self._signature
-        else:
-            return self._description
-
 
 from PyQt4.QtCore import QAbstractItemModel, QModelIndex
 
@@ -265,7 +248,7 @@ class CommandConsole(QWidget):
                 if inline:
                     self._edit.setInlineCompletion(inline)
             else:
-                completer = ShowDescriptionCompleter(command.signature, command.description)
+                completer = HelpCompleter([command])
         else:
             completer = HelpCompleter(commands.commands)
 
