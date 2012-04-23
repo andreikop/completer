@@ -4,6 +4,8 @@ from PyQt4.QtGui import qApp, QFileSystemModel, QPalette, QStyle
 import os
 import os.path
 
+from htmldelegate import htmlEscape
+
 _fsModel = QFileSystemModel()
 
 class PathCompleter:
@@ -70,15 +72,15 @@ class PathCompleter:
         typedLen = self._lastTypedSegmentLength()
         typedLenPlusInline = typedLen + len(self.inline())
         return '<b>%s</b><u>%s</u>%s' % \
-            (text[:typedLen],
-             text[typedLen:typedLenPlusInline],
-             text[typedLenPlusInline:])
+            (htmlEscape(text[:typedLen]),
+             htmlEscape(text[typedLen:typedLenPlusInline]),
+             htmlEscape(text[typedLenPlusInline:]))
 
     def _formatCurrentDir(self, text):
         return '<font style="background-color: %s; color: %s">%s</font>' % \
                 (qApp.palette().color(QPalette.Window).name(),
                  qApp.palette().color(QPalette.WindowText).name(),
-                 text)
+                 htmlEscape(text))
 
     def _classifyRowIndex(self, row):
         if self._error:
@@ -120,11 +122,11 @@ class PathCompleter:
     def text(self, row, column):
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
-            return '<font color=red>%s</font>' % self._error
+            return '<font color=red>%s</font>' % htmlEscape(self._error)
         elif rowType == self._CURRENT_DIR:
             return self._formatCurrentDir(self.path)
         elif rowType == self._STATUS:
-            return '<i>%s</i>' % self._status
+            return '<i>%s</i>' % htmlEscape(self._status)
         elif rowType == self._DIRECTORY:
             dirPath = self._dirs[index]
             dirPathNoSlash = os.path.split(dirPath)[0]

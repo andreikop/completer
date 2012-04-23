@@ -1,3 +1,21 @@
+
+_HTML_ESCAPE_TABLE = \
+{
+    "&": "&amp;",
+    '"': "&quot;",
+    "'": "&apos;",
+    ">": "&gt;",
+    "<": "&lt;",
+    " ": "&nbsp;",
+    "\t": "&nbsp;&nbsp;&nbsp;&nbsp;",
+}
+
+def htmlEscape(text):
+    """Produce entities within text.
+    """
+    return "".join(_HTML_ESCAPE_TABLE.get(c,c) for c in text)
+
+
 from PyQt4 import QtGui
 from PyQt4 import QtCore
 class HTMLDelegate(QtGui.QStyledItemDelegate):
