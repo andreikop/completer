@@ -252,7 +252,7 @@ class CommandConsole(QWidget):
     def _onEnterPressed(self):
         text = self._edit.toPlainText().strip()
         command = commands.parseCommand(text)
-        if command is not None and command.readyToExecute():
+        if command is not None and command.isReadyToExecute():
             command.execute()
             self._history[-1] = text
             if len(self._history) > 1 and \

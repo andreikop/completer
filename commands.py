@@ -55,8 +55,12 @@ class CommandOpen:
         else:
             return None
 
-    def readyToExecute(self):
+    def isReadyToExecute(self):
         return os.path.isfile(os.path.expanduser(self.path))
+
+    @staticmethod
+    def isAvailable():
+        return True
     
     def execute(self):
         print 'open file', self.path, self.line
@@ -87,13 +91,17 @@ class CommandGotoLine:
     def completer(self, text, pos):
         return None
 
-    def readyToExecute(self):
+    def isReadyToExecute(self):
         return self.line is not None
+
+    @staticmethod
+    def isAvailable():
+        return True
 
     def execute(self):
         print 'goto', self.line
 
-commands = (CommandGotoLine, CommandOpen)
+commands = [cmd for cmd in (CommandGotoLine, CommandOpen) if cmd.isAvailable()]
 
 def parseCommand(text):
     optWs = Optional(White()).suppress()
