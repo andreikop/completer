@@ -8,6 +8,13 @@ from htmldelegate import htmlEscape
 
 _fsModel = QFileSystemModel()
 
+import fnmatch
+import re
+regExPatterns = [fnmatch.translate(f) for f in ['*.pyc']]
+compositeRegExpPattern = '(' + ')|('.join(regExPatterns) + ')'
+filterRegExp = re.compile(compositeRegExpPattern)
+
+
 class PathCompleter:
     
     _ERROR = 'error'
@@ -57,7 +64,8 @@ class PathCompleter:
         # filter matching
         variants = [path for path in filesAndDirs\
                         if path.startswith(enterredFile) and \
-                           not path.startswith('.')]
+                           not path.startswith('.') and \
+                           not filterRegExp.match(path)]
         for variant in variants:
             if os.path.isdir(os.path.join(self.path, variant)):
                 self._dirs.append(variant + '/')
@@ -183,4 +191,3 @@ class PathCompleter:
             row -= len(self._dirs)  # skip dirs
             if row in range(len(self._files)):
                 return self._files[row][self._lastTypedSegmentLength():]
-        
