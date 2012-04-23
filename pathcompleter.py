@@ -7,11 +7,19 @@ import os.path
 _fsModel = QFileSystemModel()
 
 class PathCompleter:
+    
+    _ERROR = 'error'
+    _CURRENT_DIR = 'currentDir'
+    _STATUS = 'status'
+    _DIRECTORY = 'directory'
+    _FILE = 'file'
+    
     def __init__(self, text, pos):
         self._originalText = text
         self._dirs = []
         self._files = []
         self._error = None
+        self._status = None
         
         self._relative = text is None or \
                          (not text.startswith('/') and not text.startswith('~'))
@@ -47,26 +55,8 @@ class PathCompleter:
                 self._error = unicode(str(ex), 'utf8')
         else:
             self._error = 'No directory %s' % self.path
-        
-        self._texts = []
-        self._icons = []
-        if self._error:
-            self._texts.append('<font color=red>%s</font>' % self._error)
-            self._icons.append(qApp.style().standardIcon(QStyle.SP_MessageBoxCritical))
-        else:
-            self._texts.append(self._formatCurrentDir(self.path))
-            self._icons.append(None)
-            if self._dirs or self._files:
-                for dirPath in self._dirs:
-                    dirPathNoSlash = os.path.split(dirPath)[0]
-                    parDir, dirName = os.path.split(dirPathNoSlash)
-                    self._texts.append(self._formatPath(dirName + '/'))
-                for filePath in self._files:
-                    fileName = os.path.split(filePath)[1]
-                    self._texts.append(self._formatPath(fileName))
-            else:
-                self._texts.append('<i>No matching files</i>')
-                self._icons.append(None)
+        if not self._dirs and not self._files:
+            self._status = 'No matching files'
 
     def _formatPath(self, text):
         typedLen = self._lastTypedSegmentLength()
@@ -82,30 +72,77 @@ class PathCompleter:
                  qApp.palette().color(QPalette.WindowText).name(),
                  text)
 
+    def _classifyRowIndex(self, row):
+        if self._error:
+            assert row == 0
+            return (self._ERROR, 0)
+        
+        if row == 0:
+            return (self._CURRENT_DIR, 0)
+        
+        row -= 1
+        if self._status:
+            if row == 0:
+                return (self._STATUS, 0)
+            row -= 1
+        
+        if row in range(len(self._dirs)):
+            return (self._DIRECTORY, row)
+        row -= len(self._dirs)
+        
+        if row in range(len(self._files)):
+            return (self._FILE, row)
+        
+        assert False
+
     def rowCount(self):
-        return len(self._texts)
-    
+        if self._error:
+            return 1
+        else:
+            count = 1  # current directory
+            if self._status:
+                count += 1
+            count += len(self._dirs)
+            count += len(self._files)
+            return count
+
     def columnCount(self):
         return 1
     
     def text(self, row, column):
-        return self._texts[row]
+        rowType, index = self._classifyRowIndex(row)
+        if rowType == self._ERROR:
+            return '<font color=red>%s</font>' % self._error
+        elif rowType == self._CURRENT_DIR:
+            return self._formatCurrentDir(self.path)
+        elif rowType == self._STATUS:
+            return '<i>%s</i>' % self._status
+        elif rowType == self._DIRECTORY:
+            dirPath = self._dirs[index]
+            dirPathNoSlash = os.path.split(dirPath)[0]
+            parDir, dirName = os.path.split(dirPathNoSlash)
+            return self._formatPath(dirName + '/')
+        elif rowType == self._FILE:
+            filePath = self._files[index]
+            fileName = os.path.split(filePath)[1]
+            return self._formatPath(fileName)
 
     def icon(self, row, column):
-        if row < len(self._icons):
-            return self._icons[row]
-        else:
-            dirOrFileName = ''
-            
-            if row - 1 < len(self._dirs):
-                dirOrFileName = self._dirs[row - 1]
-            elif row - 1 - len(self._dirs) < len(self._files):
-                dirOrFileName = self._files[row - 1 - len(self._dirs)]
-            
-            if dirOrFileName:
-                index = _fsModel.index(os.path.join(self.path, dirOrFileName))
-                return _fsModel.data(index, Qt.DecorationRole)
-        return None
+        rowType, index = self._classifyRowIndex(row)
+        if rowType == self._ERROR:
+            return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
+        elif rowType == self._CURRENT_DIR:
+            return None
+        elif rowType == self._STATUS:
+            return None
+        elif rowType == self._DIRECTORY:
+            path = os.path.join(self.path, self._dirs[index])
+            index = _fsModel.index(path)
+            return _fsModel.data(index, Qt.DecorationRole)
+        elif rowType == self._FILE:
+            path = os.path.join(self.path, self._files[index])
+            index = _fsModel.index(path)
+            return _fsModel.data(index, Qt.DecorationRole)
 
     def _lastTypedSegmentLength(self):
         """For /home/a/Docu _lastTypedSegmentLength() is len("Docu")
@@ -136,6 +173,4 @@ class PathCompleter:
             row -= len(self._dirs)  # skip dirs
             if row in range(len(self._files)):
                 return self._files[row][self._lastTypedSegmentLength():]
-
-    def columnCount(self):
-        return 1
+        
