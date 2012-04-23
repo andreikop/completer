@@ -158,9 +158,28 @@ class _CompletableLineEdit(QTextEdit):
             self.historyPrevious.emit()
         elif event.key() == Qt.Key_Down:
             self.historyNext.emit()
+        elif event.key() == Qt.Key_Backspace and \
+             event.modifiers() == Qt.ControlModifier:
+            # Ctrl+Backspace. Usualy deletes word, but, for this edit should delete path level
+            pos = self.textCursor().position()
+            textBefore = self.toPlainText()[:pos - 1]  # -1 to ignore / at the end
+            slashIndex = textBefore.rfind('/')
+            spaceIndex = textBefore.rfind(' ')
+            if slashIndex != -1 and slashIndex > spaceIndex:
+                self._deleteToSlash()
+            else:
+                QTextEdit.keyPressEvent(self, event)
         else:
             QTextEdit.keyPressEvent(self, event)
         self.updateCompletion.emit()
+    
+    def _deleteToSlash(self):
+        text = self.toPlainText()
+        cursor = self.textCursor()
+        cursorPos = cursor.position()
+        slashPos = text.rfind('/', 0, cursorPos - 1)
+        cursor.movePosition(cursor.Left, cursor.KeepAnchor, cursorPos - slashPos - 1)
+        cursor.removeSelectedText()
     
     def mousePressEvent(self, event):
         self._clearInlineCompletion()
