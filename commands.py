@@ -48,8 +48,9 @@ class CommandOpen:
         
         return [CommandOpen(pathLocation, path, line)]
     
-    def completion(self, pos):
-        if pos == self.pathLocation + len(self.path):
+    def completer(self, text, pos):
+        if pos == self.pathLocation + len(self.path) or \
+           (not self.path and pos == len(text)):
             return PathCompleter(self.path, pos - self.pathLocation)
         else:
             return None
@@ -83,7 +84,7 @@ class CommandGotoLine:
             line = None
         return [CommandGotoLine(line)]
 
-    def completion(self, pos):
+    def completer(self, text, pos):
         return None
 
     def readyToExecute(self):

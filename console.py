@@ -233,7 +233,7 @@ class CommandConsole(QWidget):
         
         command = commands.parseCommand(text)
         if command is not None:
-            completer = command.completion(self._edit.textCursor().position())
+            completer = command.completer(self._edit.toPlainText(), self._edit.textCursor().position())
 
             if completer is not None:
                 inline = completer.inline()
