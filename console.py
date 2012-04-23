@@ -37,6 +37,9 @@ class HelpCompleter:
     
     def inline(self):
         return None
+    
+    def inlineForRow(self, row):
+        return None
 
 class ShowDescriptionCompleter:
     def __init__(self, signature, description):
@@ -60,12 +63,15 @@ class ShowDescriptionCompleter:
 
     def inline(self):
         return None
+    
+    def inlineForRow(self, row):
+        return None
 
 
 class ListModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
-        self._completer = None
+        self.completer = None
 
     def index(self, row, column, parent):
         return self.createIndex(row, column)
@@ -76,32 +82,27 @@ class ListModel(QAbstractItemModel):
     def rowCount(self, index):
         if index.isValid():
             return 0
-        if self._completer is None:
+        if self.completer is None:
             return 0
         
-        return self._completer.rowCount()
+        return self.completer.rowCount()
     
     def columnCount(self, index):
-        if self._completer is None:
+        if self.completer is None:
             return 0
-        return self._completer.columnCount()
+        return self.completer.columnCount()
     
     def data(self, index, role):
-        if self._completer is None:
+        if self.completer is None:
             return None
         if role == Qt.DisplayRole:
-            return self._completer.text(index.row(), index.column())
+            return self.completer.text(index.row(), index.column())
         elif role == Qt.DecorationRole:
-            return self._completer.icon(index.row(), index.column())
+            return self.completer.icon(index.row(), index.column())
         return None
     
-    def flags(self, index):
-        retVal = QAbstractItemModel.flags(self, index)
-        retVal &= ~Qt.ItemIsSelectable  # clear flag
-        return retVal
-    
     def setCompleter(self, completer):
-        self._completer = completer
+        self.completer = completer
         self.modelReset.emit()
 
 
@@ -181,6 +182,10 @@ class CompletableLineEdit(QTextEdit):
         self.setInlineCompletion('')
         QTextEdit.setPlainText(self, text)
         self.moveCursor(QTextCursor.End)
+    
+    def insertPlainText(self, text):
+        self._clearInlineCompletion()
+        QTextEdit.insertPlainText(self, text)
 
 
 class CommandConsole(QWidget):
@@ -201,20 +206,28 @@ class CommandConsole(QWidget):
         self._table.setItemDelegate(HTMLDelegate())
         self._table.setRootIsDecorated(False)
         self._table.setHeaderHidden(True)
+        self._table.clicked.connect(self._onItemClicked)
         self.layout().addWidget(self._table)
         
         self._edit = CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
-        self._edit.tryToComplete.connect(self._tryToComplete)
+        self._edit.tryToComplete.connect(self._updateCompletion)
         self._edit.enterPressed.connect(self._onEnterPressed)
         self._edit.historyPrevious.connect(self._onHistoryPrevious)
         self._edit.historyNext.connect(self._onHistoryNext)
         self.setFocusProxy(self._edit)
 
         self._edit.setFocus()
-        self._tryToComplete()
+        self._updateCompletion()
 
-    def _tryToComplete(self):
+    def _onItemClicked(self, index):
+        inlineForRow = self._model.completer.inlineForRow(index.row())
+        if inlineForRow is not None:
+            self._edit.insertPlainText(inlineForRow)
+            self._updateCompletion()
+            self._onEnterPressed()
+
+    def _updateCompletion(self):
         text = self._edit.toPlainText()
         completer = None
         
@@ -247,6 +260,7 @@ class CommandConsole(QWidget):
             self._history.append('')  # new edited command
             self._historyIndex = len(self._history) - 1
             self._edit.clear()
+            self._updateCompletion()
     
     def _onHistoryPrevious(self):
         if self._historyIndex == len(self._history) - 1:  # save edited command

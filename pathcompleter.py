@@ -128,5 +128,14 @@ class PathCompleter:
             else:
                 return ''
 
+    def inlineForRow(self, row):
+        row -= 1  # skip current directory
+        if row in range(len(self._dirs)):
+            return self._dirs[row][self._lastTypedSegmentLength():]
+        else:
+            row -= len(self._dirs)  # skip dirs
+            if row in range(len(self._files)):
+                return self._files[row][self._lastTypedSegmentLength():]
+
     def columnCount(self):
         return 1
