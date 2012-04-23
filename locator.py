@@ -14,9 +14,49 @@ import sys
 from htmldelegate import HTMLDelegate
 import commands
 
-from PyQt4.QtCore import QAbstractItemModel, QModelIndex
+class AbstractCommand:
+    signature = 'set signature here!!!'
+    description = 'set description here!!!'
 
-class HelpCompleter:
+    @staticmethod
+    def pattern():
+        raise NotImplemented()
+    
+    def completer(self, text, pos):
+        return None
+
+    @staticmethod
+    def isAvailable():
+        return True
+
+    def isReadyToExecute(self):
+        return True
+
+    def execute(self):
+        raise NotImplemented()
+
+
+class AbstractCompleter:
+    def rowCount(self):
+        raise NotImplemented()
+    
+    def columnCount(self):
+        return 1
+    
+    def text(self, row, column):
+        raise NotImplemented()
+    
+    def icon(self, row, column):
+        return None
+    
+    def inline(self):
+        return None
+    
+    def inlineForRow(self, row):
+        return None
+
+
+class HelpCompleter(AbstractCompleter):
     def __init__(self, commands):
         self._commands = commands
     
@@ -31,15 +71,6 @@ class HelpCompleter:
             return self._commands[row].signature
         else:
             return self._commands[row].description
-    
-    def icon(self, row, column):
-        return None
-    
-    def inline(self):
-        return None
-    
-    def inlineForRow(self, row):
-        return None
 
 class ShowDescriptionCompleter:
     def __init__(self, signature, description):
@@ -57,16 +88,9 @@ class ShowDescriptionCompleter:
             return self._signature
         else:
             return self._description
-    
-    def icon(self, row, column):
-        return None
 
-    def inline(self):
-        return None
-    
-    def inlineForRow(self, row):
-        return None
 
+from PyQt4.QtCore import QAbstractItemModel, QModelIndex
 
 class ListModel(QAbstractItemModel):
     def __init__(self):

@@ -4,9 +4,9 @@ from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, Parse
                      StringEnd, Suppress, White, Word, nums
 
 from pathcompleter import PathCompleter
+from locator import AbstractCommand
 
-
-class CommandOpen:
+class CommandOpen(AbstractCommand):
     
     signature = '[f] PATH [LINE]'
     description = 'Open file'
@@ -65,7 +65,7 @@ class CommandOpen:
     def execute(self):
         print 'open file', self.path, self.line
 
-class CommandGotoLine:
+class CommandGotoLine(AbstractCommand):
     signature = '[l] [LINE]'
     description = 'Go to line'
 

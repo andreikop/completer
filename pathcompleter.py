@@ -5,6 +5,7 @@ import os
 import os.path
 
 from htmldelegate import htmlEscape
+from locator import AbstractCompleter
 
 _fsModel = QFileSystemModel()
 
@@ -15,7 +16,7 @@ compositeRegExpPattern = '(' + ')|('.join(regExPatterns) + ')'
 filterRegExp = re.compile(compositeRegExpPattern)
 
 
-class PathCompleter:
+class PathCompleter(AbstractCompleter):
     
     _ERROR = 'error'
     _CURRENT_DIR = 'currentDir'
@@ -124,9 +125,6 @@ class PathCompleter:
             count += len(self._files)
             return count
 
-    def columnCount(self):
-        return 1
-    
     def text(self, row, column):
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
