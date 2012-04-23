@@ -1,22 +1,23 @@
-#!/usr/bin/env python
-
-import sip
-sip.setapi('QString', 2)
-
-from PyQt4.QtCore import pyqtSignal, QSize, Qt
+from PyQt4.QtCore import pyqtSignal, QAbstractItemModel, QModelIndex, QSize, Qt
 from PyQt4.QtGui import QApplication, QFontMetrics, QPalette, QSizePolicy, QStyle, \
                         QStyle, QStyleOptionFrameV2, \
                         QTextCursor, QTextEdit, QTextOption, QTreeView, QVBoxLayout, QWidget
 
 import os
-import sys
+
+from pyparsing import Optional, Or, ParseException, StringEnd, White
+
 
 from htmldelegate import HTMLDelegate
-import commands
 
 class AbstractCommand:
-    signature = 'set signature here!!!'
-    description = 'set description here!!!'
+    @staticmethod
+    def signature():
+        raise NotImplemented()
+    
+    @staticmethod
+    def description():
+        raise NotImplemented()
 
     @staticmethod
     def pattern():
@@ -56,7 +57,7 @@ class AbstractCompleter:
         return None
 
 
-class HelpCompleter(AbstractCompleter):
+class _HelpCompleter(AbstractCompleter):
     def __init__(self, commands):
         self._commands = commands
     
@@ -68,14 +69,12 @@ class HelpCompleter(AbstractCompleter):
     
     def text(self, row, column):
         if column == 0:
-            return self._commands[row].signature
+            return self._commands[row].signature()
         else:
-            return self._commands[row].description
+            return self._commands[row].description()
 
 
-from PyQt4.QtCore import QAbstractItemModel, QModelIndex
-
-class ListModel(QAbstractItemModel):
+class _CompleterModel(QAbstractItemModel):
     def __init__(self):
         QAbstractItemModel.__init__(self)
         self.completer = None
@@ -113,8 +112,8 @@ class ListModel(QAbstractItemModel):
         self.modelReset.emit()
 
 
-class CompletableLineEdit(QTextEdit):
-    tryToComplete = pyqtSignal()
+class _CompletableLineEdit(QTextEdit):
+    updateCompletion = pyqtSignal()
     enterPressed = pyqtSignal()
     historyPrevious = pyqtSignal()
     historyNext = pyqtSignal()
@@ -146,7 +145,7 @@ class CompletableLineEdit(QTextEdit):
                 color = self.palette().color(QPalette.Base).name()
                 self.insertHtml('<font style="background-color: %s">%s</font>' % (color, self._inlineCompletion))
                 self._clearInlineCompletion()
-                self.tryToComplete.emit()
+                self.updateCompletion.emit()
             return True
         else:
             return QTextEdit.event(self, event)
@@ -161,13 +160,13 @@ class CompletableLineEdit(QTextEdit):
             self.historyNext.emit()
         else:
             QTextEdit.keyPressEvent(self, event)
-        self.tryToComplete.emit()
+        self.updateCompletion.emit()
     
     def mousePressEvent(self, event):
         self._clearInlineCompletion()
         QTextEdit.mousePressEvent(self, event)
         if self.textCursor().atEnd():
-            self.tryToComplete.emit()
+            self.updateCompletion.emit()
 
     def _clearInlineCompletion(self):
         if self._inlineCompletion is not None:
@@ -195,10 +194,11 @@ class CompletableLineEdit(QTextEdit):
         QTextEdit.insertPlainText(self, text)
 
 
-class CommandConsole(QWidget):
+class Locator(QWidget):
     def __init__(self, *args):
         QWidget.__init__(self, *args)
         
+        self._commandClasses = []
         self._history = ['']
         self._historyIndex = 0
         self._incompleteCommand = None
@@ -208,7 +208,7 @@ class CommandConsole(QWidget):
         self.layout().setSpacing(1)
         
         self._table = QTreeView(self)
-        self._model = ListModel()
+        self._model = _CompleterModel()
         self._table.setModel(self._model)
         self._table.setItemDelegate(HTMLDelegate())
         self._table.setRootIsDecorated(False)
@@ -216,9 +216,9 @@ class CommandConsole(QWidget):
         self._table.clicked.connect(self._onItemClicked)
         self.layout().addWidget(self._table)
         
-        self._edit = CompletableLineEdit(self)
+        self._edit = _CompletableLineEdit(self)
         self.layout().addWidget(self._edit)
-        self._edit.tryToComplete.connect(self._updateCompletion)
+        self._edit.updateCompletion.connect(self._updateCompletion)
         self._edit.enterPressed.connect(self._onEnterPressed)
         self._edit.historyPrevious.connect(self._onHistoryPrevious)
         self._edit.historyNext.connect(self._onHistoryNext)
@@ -239,7 +239,7 @@ class CommandConsole(QWidget):
         text = self._edit.toPlainText()
         completer = None
         
-        command = commands.parseCommand(text)
+        command = self._parseCommand(text)
         if command is not None:
             completer = command.completer(self._edit.toPlainText(), self._edit.textCursor().position())
 
@@ -248,9 +248,9 @@ class CommandConsole(QWidget):
                 if inline:
                     self._edit.setInlineCompletion(inline)
             else:
-                completer = HelpCompleter([command])
+                completer = _HelpCompleter([command])
         else:
-            completer = HelpCompleter(commands.commands)
+            completer = _HelpCompleter(self._availableCommands())
 
         self._model.setCompleter(completer)
         self._table.resizeColumnToContents(0)
@@ -258,7 +258,7 @@ class CommandConsole(QWidget):
     
     def _onEnterPressed(self):
         text = self._edit.toPlainText().strip()
-        command = commands.parseCommand(text)
+        command = self._parseCommand(text)
         if command is not None and command.isReadyToExecute():
             command.execute()
             self._history[-1] = text
@@ -282,14 +282,25 @@ class CommandConsole(QWidget):
         if self._historyIndex < len(self._history) - 1:
             self._historyIndex += 1
             self._edit.setPlainText(self._history[self._historyIndex])
+    
+    def addCommandClass(self, commandClass):
+        self._commandClasses.append(commandClass)
+    
+    def removeCommandClass(self, commandClass):
+        self._commandClasses.remove(commandClass)
+    
+    def _availableCommands(self):
+        return [cmd for cmd in self._commandClasses if cmd.isAvailable()]
 
+    def _parseCommand(self, text):
+        optWs = Optional(White()).suppress()
+        pattern = optWs + Or([cmd.pattern() for cmd in self._availableCommands()]) + optWs + StringEnd()
+        try:
+            res = pattern.parseString(text)
+            return res[0]
+        except ParseException:
+            return None
 
-def main():
-    app = QApplication(sys.argv)
-    w = CommandConsole()
-    w.show()
-    return app.exec_()
-
-if __name__ == '__main__':
-    main()
-
+    def show(self):
+        self._updateCompletion()
+        QWidget.show(self)

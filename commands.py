@@ -8,13 +8,13 @@ from locator import AbstractCommand
 
 class CommandOpen(AbstractCommand):
     
-    signature = '[f] PATH [LINE]'
-    description = 'Open file'
+    @staticmethod
+    def signature():
+        return '[f] PATH [LINE]'
     
-    def __init__(self, pathLocation, path, line):
-        self.path = path
-        self.pathLocation = pathLocation
-        self.line = line
+    @staticmethod
+    def description():
+       return 'Open file'
     
     @staticmethod
     def pattern():
@@ -47,6 +47,15 @@ class CommandOpen(AbstractCommand):
             line = None
         
         return [CommandOpen(pathLocation, path, line)]
+
+    @staticmethod
+    def isAvailable():
+        return True
+    
+    def __init__(self, pathLocation, path, line):
+        self.path = path
+        self.pathLocation = pathLocation
+        self.line = line
     
     def completer(self, text, pos):
         if pos == self.pathLocation + len(self.path) or \
@@ -58,20 +67,19 @@ class CommandOpen(AbstractCommand):
     def isReadyToExecute(self):
         return os.path.isfile(os.path.expanduser(self.path))
 
-    @staticmethod
-    def isAvailable():
-        return True
-    
     def execute(self):
         print 'open file', self.path, self.line
 
 class CommandGotoLine(AbstractCommand):
-    signature = '[l] [LINE]'
-    description = 'Go to line'
-
-    def __init__(self, line):
-        self.line = line
     
+    @staticmethod
+    def signature():
+        return '[l] [LINE]'
+    
+    @staticmethod
+    def description():
+       return 'Go to line'
+
     @staticmethod
     def pattern():
         line = Word(nums)("line")
@@ -88,26 +96,18 @@ class CommandGotoLine(AbstractCommand):
             line = None
         return [CommandGotoLine(line)]
 
+    @staticmethod
+    def isAvailable():
+        return True
+
+    def __init__(self, line):
+        self.line = line
+    
     def completer(self, text, pos):
         return None
 
     def isReadyToExecute(self):
         return self.line is not None
 
-    @staticmethod
-    def isAvailable():
-        return True
-
     def execute(self):
         print 'goto', self.line
-
-commands = [cmd for cmd in (CommandGotoLine, CommandOpen) if cmd.isAvailable()]
-
-def parseCommand(text):
-    optWs = Optional(White()).suppress()
-    pattern = optWs + Or([cmd.pattern() for cmd in commands]) + optWs + StringEnd()
-    try:
-        res = pattern.parseString(text)
-        return res[0]
-    except ParseException:
-        return None
