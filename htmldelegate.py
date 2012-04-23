@@ -3,6 +3,9 @@ from PyQt4 import QtCore
 class HTMLDelegate(QtGui.QStyledItemDelegate):
     #http://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt/1956781#1956781
     def paint(self, painter, option, index):
+        
+        option.state &= ~QtGui.QStyle.State_HasFocus  # never draw focus rect
+        
         options = QtGui.QStyleOptionViewItemV4(option)
         self.initStyleOption(options,index)
 
