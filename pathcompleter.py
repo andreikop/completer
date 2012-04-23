@@ -38,23 +38,31 @@ class PathCompleter:
         if self.path != '/':
             self.path += '/'
 
-        if os.path.isdir(self.path):
-            # filter matching
-            try:
-                variants = [path for path in os.listdir(self.path) \
-                                if path.startswith(enterredFile) and \
-                                   not path.startswith('.')]
-                for variant in variants:
-                    if os.path.isdir(os.path.join(self.path, variant)):
-                        self._dirs.append(variant + '/')
-                    else:
-                        self._files.append(variant)
-                self._dirs.sort()
-                self._files.sort()
-            except OSError, ex:
-                self._error = unicode(str(ex), 'utf8')
-        else:
-            self._error = 'No directory %s' % self.path
+        if not os.path.isdir(self.path):
+            self._status = 'No directory %s' % self.path
+            return
+
+        try:
+            filesAndDirs = os.listdir(self.path)
+        except OSError, ex:
+            self._error = unicode(str(ex), 'utf8')
+            return
+        
+        if not filesAndDirs:
+            self._status = 'Empty directory'
+            return
+        
+        # filter matching
+        variants = [path for path in filesAndDirs\
+                        if path.startswith(enterredFile) and \
+                           not path.startswith('.')]
+        for variant in variants:
+            if os.path.isdir(os.path.join(self.path, variant)):
+                self._dirs.append(variant + '/')
+            else:
+                self._files.append(variant)
+        self._dirs.sort()
+        self._files.sort()
         if not self._dirs and not self._files:
             self._status = 'No matching files'
 
