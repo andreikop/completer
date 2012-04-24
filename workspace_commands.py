@@ -55,17 +55,17 @@ class CommandGotoLine(AbstractCommand):
         return True
 
     def __init__(self, line):
-        self.line = line
+        self._line = line
     
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return self.line is not None
+        return self._line is not None
 
     def execute(self):
         """Execute the command
         """
-        print 'goto', self.line
+        print 'goto', self._line
 
 
 class CommandOpen(AbstractCommand):
@@ -122,30 +122,30 @@ class CommandOpen(AbstractCommand):
         return [CommandOpen(pathLocation, path, line)]
 
     def __init__(self, pathLocation, path, line):
-        self.path = path
-        self.pathLocation = pathLocation
-        self.line = line
+        self._path = path
+        self._pathLocation = pathLocation
+        self._line = line
     
     def completer(self, text, pos):
         """Command completer.
         If cursor is after path, returns PathCompleter or GlobCompleter 
         """
-        if pos == self.pathLocation + len(self.path) or \
-           (not self.path and pos == len(text)):
-            return makeSuitableCompleter(self.path, pos - self.pathLocation)
+        if pos == self._pathLocation + len(self._path) or \
+           (not self._path and pos == len(text)):
+            return makeSuitableCompleter(self._path, pos - self._pathLocation)
         else:
             return None
 
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return glob.glob(os.path.expanduser(self.path))
+        return glob.glob(os.path.expanduser(self._path))
 
     def execute(self):
         """Execute the command
         """
-        for path in glob.iglob(os.path.expanduser(self.path)):
-            print 'open file', path, self.line
+        for path in glob.iglob(os.path.expanduser(self._path)):
+            print 'open file', path, self._line
 
 
 class CommandSaveAs(AbstractCommand):
@@ -198,25 +198,25 @@ class CommandSaveAs(AbstractCommand):
         return True
     
     def __init__(self, pathLocation, path):
-        self.path = path
-        self.pathLocation = pathLocation
+        self._path = path
+        self._pathLocation = pathLocation
     
     def completer(self, text, pos):
         """Command Completer.
         Returns PathCompleter, if cursor stays after path
         """
-        if pos == self.pathLocation + len(self.path) or \
-           (not self.path and pos == len(text)):
-            return PathCompleter(self.path, pos - self.pathLocation)
+        if pos == self._pathLocation + len(self._path) or \
+           (not self._path and pos == len(text)):
+            return PathCompleter(self._path, pos - self._pathLocation)
         else:
             return None
 
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return len(self.path) > 0 and not os.path.isdir(self.path)
+        return len(self._path) > 0 and not os.path.isdir(self._path)
 
     def execute(self):
         """Execute command
         """
-        print 'save file as', self.path
+        print 'save file as', self._path
