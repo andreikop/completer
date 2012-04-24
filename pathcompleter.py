@@ -266,7 +266,7 @@ class GlobCompleter(AbstractPathCompleter):
     """
     def __init__(self, text):
         AbstractPathCompleter.__init__(self, text)
-        variants = glob.iglob(text + '*')
+        variants = glob.iglob(os.path.expanduser(text) + '*')
         variants = self._filterHidden(variants)
         variants.sort()
         
