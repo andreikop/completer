@@ -1,12 +1,20 @@
+"""
+pathcompleter --- Path completer for Locator
+============================================
+"""
+
+
 from PyQt4.QtCore import Qt
 from PyQt4.QtGui import qApp, QFileSystemModel, QPalette, QStyle
 
 import os
 import os.path
+import glob
 
 from htmldelegate import htmlEscape
 from locator import AbstractCompleter
 
+# global object. Reused by all completers
 _fsModel = QFileSystemModel()
 
 import fnmatch
@@ -17,6 +25,10 @@ filterRegExp = re.compile(compositeRegExpPattern)
 
 
 class PathCompleter(AbstractCompleter):
+    """Path completer for Locator
+    
+    Used by Open and SaveAs commands
+    """
     
     _ERROR = 'error'
     _CURRENT_DIR = 'currentDir'
@@ -48,36 +60,45 @@ class PathCompleter(AbstractCompleter):
         if self.path != '/':
             self.path += '/'
 
-        if not os.path.isdir(self.path):
-            self._status = 'No directory %s' % self.path
-            return
+        if '*' in self.path or '?' in self.path or '[' in self.path:  # Use globs
+            variants = glob.iglob(self.path)
+        else:
+            if not os.path.isdir(self.path):
+                self._status = 'No directory %s' % self.path
+                return
 
-        try:
-            filesAndDirs = os.listdir(self.path)
-        except OSError, ex:
-            self._error = unicode(str(ex), 'utf8')
-            return
+            try:
+                filesAndDirs = os.listdir(self.path)
+            except OSError, ex:
+                self._error = unicode(str(ex), 'utf8')
+                return
+            
+            if not filesAndDirs:
+                self._status = 'Empty directory'
+                return
+            
+            # filter matching
+            variants = [path for path in filesAndDirs\
+                            if path.startswith(enterredFile)]
         
-        if not filesAndDirs:
-            self._status = 'Empty directory'
-            return
-        
-        # filter matching
-        variants = [path for path in filesAndDirs\
-                        if path.startswith(enterredFile) and \
-                           not path.startswith('.') and \
+        # filter hidden and ignored files
+        variants = [path for path in variants \
+                        if not path.startswith('.') and \
                            not filterRegExp.match(path)]
         for variant in variants:
             if os.path.isdir(os.path.join(self.path, variant)):
                 self._dirs.append(variant + '/')
             else:
                 self._files.append(variant)
+
         self._dirs.sort()
         self._files.sort()
         if not self._dirs and not self._files:
             self._status = 'No matching files'
 
     def _formatPath(self, text):
+        """Format file or directory for show it in the list of completions
+        """
         typedLen = self._lastTypedSegmentLength()
         typedLenPlusInline = typedLen + len(self.inline())
         return '<b>%s</b><u>%s</u>%s' % \
@@ -86,12 +107,17 @@ class PathCompleter(AbstractCompleter):
              htmlEscape(text[typedLenPlusInline:]))
 
     def _formatCurrentDir(self, text):
+        """Format current directory for show it in the list of completions
+        """
         return '<font style="background-color: %s; color: %s">%s</font>' % \
                 (qApp.palette().color(QPalette.Window).name(),
                  qApp.palette().color(QPalette.WindowText).name(),
                  htmlEscape(text))
 
     def _classifyRowIndex(self, row):
+        """Get list item type and index by it's row
+        """
+
         if self._error:
             assert row == 0
             return (self._ERROR, 0)
@@ -115,6 +141,8 @@ class PathCompleter(AbstractCompleter):
         assert False
 
     def rowCount(self):
+        """Row count in the list of completions
+        """
         if self._error:
             return 1
         else:
@@ -126,6 +154,8 @@ class PathCompleter(AbstractCompleter):
             return count
 
     def text(self, row, column):
+        """Item text in the list of completions
+        """
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
             return '<font color=red>%s</font>' % htmlEscape(self._error)
@@ -144,6 +174,8 @@ class PathCompleter(AbstractCompleter):
             return self._formatPath(fileName)
 
     def icon(self, row, column):
+        """Item icon in the list of completions
+        """
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
             return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
@@ -161,17 +193,23 @@ class PathCompleter(AbstractCompleter):
             return _fsModel.data(index, Qt.DecorationRole)
 
     def _lastTypedSegmentLength(self):
-        """For /home/a/Docu _lastTypedSegmentLength() is len("Docu")
+        """Length of path segment, typed by a user
+        
+        For /home/a/Docu _lastTypedSegmentLength() is len("Docu")
         """
         return len(os.path.split(self._originalText)[1])
     
     def _commonStart(self, a, b):
+        """The longest common start of 2 string
+        """
         for index, char in enumerate(a):
             if len(b) <= index or b[index] != char:
                 return a[:index]
         return a
 
     def inline(self):
+        """Inline completion. Displayed after the cursor
+        """
         if self._error is not None:
             return None
         else:
@@ -182,6 +220,8 @@ class PathCompleter(AbstractCompleter):
                 return ''
 
     def inlineForRow(self, row):
+        """User clicked a row. Get inline completion for this row
+        """
         row -= 1  # skip current directory
         if row in range(len(self._dirs)):
             return self._dirs[row][self._lastTypedSegmentLength():]

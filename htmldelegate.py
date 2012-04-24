@@ -1,3 +1,10 @@
+"""
+htmldelegate --- QStyledItemDelegate delegate. Draws HTML
+=========================================================
+"""
+
+from PyQt4 import QtGui
+from PyQt4 import QtCore
 
 _HTML_ESCAPE_TABLE = \
 {
@@ -11,17 +18,20 @@ _HTML_ESCAPE_TABLE = \
 }
 
 def htmlEscape(text):
-    """Produce entities within text.
+    """Replace special HTML symbols with escase sequences
     """
     return "".join(_HTML_ESCAPE_TABLE.get(c,c) for c in text)
 
 
-from PyQt4 import QtGui
-from PyQt4 import QtCore
 class HTMLDelegate(QtGui.QStyledItemDelegate):
-    #http://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt/1956781#1956781
+    """QStyledItemDelegate implementation. Draws HTML
+    
+    http://stackoverflow.com/questions/1956542/how-to-make-item-view-render-rich-html-text-in-qt/1956781#1956781
+    """
+    
     def paint(self, painter, option, index):
-        
+        """QStyledItemDelegate.paint implementation
+        """
         option.state &= ~QtGui.QStyle.State_HasFocus  # never draw focus rect
         
         options = QtGui.QStyleOptionViewItemV4(option)
@@ -52,6 +62,8 @@ class HTMLDelegate(QtGui.QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
+        """QStyledItemDelegate.sizeHint implementation
+        """
         options = QtGui.QStyleOptionViewItemV4(option)
         self.initStyleOption(options,index)
 

@@ -1,3 +1,8 @@
+"""
+workspace_commands --- Open, SaveAs, GotoLine commands
+======================================================
+"""
+
 import os.path
 
 from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, \
@@ -8,17 +13,24 @@ from locator import AbstractCommand
 
 
 class CommandGotoLine(AbstractCommand):
-    
+    """Go to line command implementation
+    """
     @staticmethod
     def signature():
+        """Command signature. For Help
+        """
         return '[l] [LINE]'
     
     @staticmethod
     def description():
-       return 'Go to line'
+        """Command description. For Help
+        """
+        return 'Go to line'
 
     @staticmethod
     def pattern():
+        """Pyparsing pattern
+        """
         line = Word(nums)("line")
         pat = (Literal('l ') + Suppress(Optional(White())) + Optional(line)) ^ line
         pat.leaveWhitespace()
@@ -27,6 +39,8 @@ class CommandGotoLine(AbstractCommand):
     
     @staticmethod
     def create(str, loc, tocs):
+        """Callback for pyparsing. Creates an instance of command
+        """
         if tocs.line:
             line = int(tocs.line)
         else:
@@ -35,18 +49,21 @@ class CommandGotoLine(AbstractCommand):
 
     @staticmethod
     def isAvailable():
+        """Check if command is currently available
+        """
         return True
 
     def __init__(self, line):
         self.line = line
     
-    def completer(self, text, pos):
-        return None
-
     def isReadyToExecute(self):
+        """Check if command is complete and ready to execute
+        """
         return self.line is not None
 
     def execute(self):
+        """Execute the command
+        """
         print 'goto', self.line
 
 
@@ -54,15 +71,24 @@ class CommandOpen(AbstractCommand):
     
     @staticmethod
     def signature():
+        """Command signature. For Help
+        """
         return '[f] PATH [LINE]'
     
     @staticmethod
     def description():
-       return 'Open file'
+        """Command description. For Help
+        """
+        return 'Open file'
     
     @staticmethod
     def pattern():
+        """pyparsing pattern
+        """
+        
         def attachLocation(s, loc, tocs):
+            """pyparsing callback. Saves path position in the original string
+            """
             return [(loc, tocs[0])]
 
         path = CharsNotIn(" \t")("path")
@@ -80,6 +106,8 @@ class CommandOpen(AbstractCommand):
 
     @staticmethod
     def create(str, loc, tocs):
+        """pyparsing callback. Creates an instance of command
+        """
         if tocs.path:
             pathLocation, path = tocs.path
         else:
@@ -92,16 +120,15 @@ class CommandOpen(AbstractCommand):
         
         return [CommandOpen(pathLocation, path, line)]
 
-    @staticmethod
-    def isAvailable():
-        return True
-    
     def __init__(self, pathLocation, path, line):
         self.path = path
         self.pathLocation = pathLocation
         self.line = line
     
     def completer(self, text, pos):
+        """Command completer.
+        If cursor is after path, returns PathCompleter
+        """
         if pos == self.pathLocation + len(self.path) or \
            (not self.path and pos == len(text)):
             return PathCompleter(self.path, pos - self.pathLocation)
@@ -109,24 +136,36 @@ class CommandOpen(AbstractCommand):
             return None
 
     def isReadyToExecute(self):
+        """Check if command is complete and ready to execute
+        """
         return os.path.isfile(os.path.expanduser(self.path))
 
     def execute(self):
+        """Execute the command
+        """
         print 'open file', self.path, self.line
 
 
 class CommandSaveAs(AbstractCommand):
+    """Save As Locator command
+    """
     
     @staticmethod
     def signature():
+        """Command signature. For Help
+        """
         return 's PATH'
     
     @staticmethod
     def description():
-       return 'Save file As'
+        """Command description. For Help
+        """
+        return 'Save file As'
     
     @staticmethod
     def pattern():
+        """pyparsing pattern of the command
+        """
         def attachLocation(s, loc, tocs):
             return [(loc, tocs[0])]
 
@@ -140,6 +179,8 @@ class CommandSaveAs(AbstractCommand):
 
     @staticmethod
     def create(str, loc, tocs):
+        """Callback for pyparsing. Creates an instance
+        """
         if tocs.path:
             pathLocation, path = tocs.path
         else:
@@ -149,6 +190,9 @@ class CommandSaveAs(AbstractCommand):
 
     @staticmethod
     def isAvailable():
+        """Check if command is available.
+        It is available, if at least one document is opened
+        """
         return True
     
     def __init__(self, pathLocation, path):
@@ -156,6 +200,9 @@ class CommandSaveAs(AbstractCommand):
         self.pathLocation = pathLocation
     
     def completer(self, text, pos):
+        """Command Completer.
+        Returns PathCompleter, if cursor stays after path
+        """
         if pos == self.pathLocation + len(self.path) or \
            (not self.path and pos == len(text)):
             return PathCompleter(self.path, pos - self.pathLocation)
@@ -163,7 +210,11 @@ class CommandSaveAs(AbstractCommand):
             return None
 
     def isReadyToExecute(self):
+        """Check if command is complete and ready to execute
+        """
         return len(self.path) > 0
 
     def execute(self):
+        """Execute command
+        """
         print 'save file as', self.path
