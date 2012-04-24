@@ -4,11 +4,12 @@ workspace_commands --- Open, SaveAs, GotoLine commands
 """
 
 import os.path
+import glob
 
 from pyparsing import CharsNotIn, Combine, Keyword, Literal, Optional, Or, ParseException, \
                      StringEnd, Suppress, White, Word, nums
 
-from pathcompleter import PathCompleter
+from pathcompleter import makeSuitableCompleter, PathCompleter
 from locator import AbstractCommand
 
 
@@ -79,7 +80,7 @@ class CommandOpen(AbstractCommand):
     def description():
         """Command description. For Help
         """
-        return 'Open file'
+        return 'Open file. Globs are supported'
     
     @staticmethod
     def pattern():
@@ -127,23 +128,24 @@ class CommandOpen(AbstractCommand):
     
     def completer(self, text, pos):
         """Command completer.
-        If cursor is after path, returns PathCompleter
+        If cursor is after path, returns PathCompleter or GlobCompleter 
         """
         if pos == self.pathLocation + len(self.path) or \
            (not self.path and pos == len(text)):
-            return PathCompleter(self.path, pos - self.pathLocation)
+            return makeSuitableCompleter(self.path, pos - self.pathLocation)
         else:
             return None
 
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return os.path.isfile(os.path.expanduser(self.path))
+        return glob.glob(os.path.expanduser(self.path))
 
     def execute(self):
         """Execute the command
         """
-        print 'open file', self.path, self.line
+        for path in glob.iglob(os.path.expanduser(self.path)):
+            print 'open file', path, self.line
 
 
 class CommandSaveAs(AbstractCommand):

@@ -14,105 +14,47 @@ import glob
 from htmldelegate import htmlEscape
 from locator import AbstractCompleter
 
-# global object. Reused by all completers
-_fsModel = QFileSystemModel()
-
 import fnmatch
 import re
 regExPatterns = [fnmatch.translate(f) for f in ['*.pyc']]
 compositeRegExpPattern = '(' + ')|('.join(regExPatterns) + ')'
 filterRegExp = re.compile(compositeRegExpPattern)
 
+def makeSuitableCompleter(text, pos):
+    """Returns PathCompleter if text is normal path or GlobCompleter for glob
+    """
+    if '*' in text or '?' in text or '[' in text:
+        return GlobCompleter(text)
+    else:
+        return PathCompleter(text, pos)
 
-class PathCompleter(AbstractCompleter):
-    """Path completer for Locator
-    
-    Used by Open and SaveAs commands
+class AbstractPathCompleter(AbstractCompleter):
+    """Base class for PathCompleter and GlobCompleter
     """
     
+    # global object. Reused by all completers
+    _fsModel = QFileSystemModel()
+
     _ERROR = 'error'
-    _CURRENT_DIR = 'currentDir'
+    _HEADER = 'currentDir'
     _STATUS = 'status'
     _DIRECTORY = 'directory'
     _FILE = 'file'
     
-    def __init__(self, text, pos):
+    def __init__(self, text):
         self._originalText = text
         self._dirs = []
         self._files = []
         self._error = None
         self._status = None
-        
-        self._relative = text is None or \
-                         (not text.startswith('/') and not text.startswith('~'))
-        
-        enterredDir = os.path.dirname(text)
-        enterredFile = os.path.basename(text)
-        
-        if enterredDir.startswith('/'):
-            pass
-        elif text.startswith('~'):
-            enterredDir = os.path.expanduser(enterredDir)
-        else:  # relative path
-            enterredDir = os.path.abspath(os.path.join(os.path.curdir, enterredDir))
-        
-        self.path = os.path.normpath(enterredDir)
-        if self.path != '/':
-            self.path += '/'
-
-        if '*' in self.path or '?' in self.path or '[' in self.path:  # Use globs
-            variants = glob.iglob(self.path)
-        else:
-            if not os.path.isdir(self.path):
-                self._status = 'No directory %s' % self.path
-                return
-
-            try:
-                filesAndDirs = os.listdir(self.path)
-            except OSError, ex:
-                self._error = unicode(str(ex), 'utf8')
-                return
-            
-            if not filesAndDirs:
-                self._status = 'Empty directory'
-                return
-            
-            # filter matching
-            variants = [path for path in filesAndDirs\
-                            if path.startswith(enterredFile)]
-        
-        # filter hidden and ignored files
-        variants = [path for path in variants \
-                        if not path.startswith('.') and \
-                           not filterRegExp.match(path)]
-        for variant in variants:
-            if os.path.isdir(os.path.join(self.path, variant)):
-                self._dirs.append(variant + '/')
-            else:
-                self._files.append(variant)
-
-        self._dirs.sort()
-        self._files.sort()
-        if not self._dirs and not self._files:
-            self._status = 'No matching files'
-
-    def _formatPath(self, text):
-        """Format file or directory for show it in the list of completions
+    
+    @staticmethod
+    def _filterHidden(paths):
+        """Remove hidden and ignored files from the list
         """
-        typedLen = self._lastTypedSegmentLength()
-        typedLenPlusInline = typedLen + len(self.inline())
-        return '<b>%s</b><u>%s</u>%s' % \
-            (htmlEscape(text[:typedLen]),
-             htmlEscape(text[typedLen:typedLenPlusInline]),
-             htmlEscape(text[typedLenPlusInline:]))
-
-    def _formatCurrentDir(self, text):
-        """Format current directory for show it in the list of completions
-        """
-        return '<font style="background-color: %s; color: %s">%s</font>' % \
-                (qApp.palette().color(QPalette.Window).name(),
-                 qApp.palette().color(QPalette.WindowText).name(),
-                 htmlEscape(text))
+        return [path for path in paths \
+                    if not os.path.basename(path).startswith('.') and \
+                        not filterRegExp.match(path)]
 
     def _classifyRowIndex(self, row):
         """Get list item type and index by it's row
@@ -123,7 +65,7 @@ class PathCompleter(AbstractCompleter):
             return (self._ERROR, 0)
         
         if row == 0:
-            return (self._CURRENT_DIR, 0)
+            return (self._HEADER, 0)
         
         row -= 1
         if self._status:
@@ -140,6 +82,14 @@ class PathCompleter(AbstractCompleter):
         
         assert False
 
+    def _formatHeader(self, text):
+        """Format current directory for show it in the list of completions
+        """
+        return '<font style="background-color: %s; color: %s">%s</font>' % \
+                (qApp.palette().color(QPalette.Window).name(),
+                 qApp.palette().color(QPalette.WindowText).name(),
+                 htmlEscape(text))
+
     def rowCount(self):
         """Row count in the list of completions
         """
@@ -153,25 +103,27 @@ class PathCompleter(AbstractCompleter):
             count += len(self._files)
             return count
 
+    @staticmethod
+    def _iconForPath(path):
+        """Get icon for file or directory path. Uses QFileSystemModel
+        """
+        index = AbstractPathCompleter._fsModel.index(path)
+        return AbstractPathCompleter._fsModel.data(index, Qt.DecorationRole)
+
     def text(self, row, column):
         """Item text in the list of completions
         """
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
             return '<font color=red>%s</font>' % htmlEscape(self._error)
-        elif rowType == self._CURRENT_DIR:
-            return self._formatCurrentDir(self.path)
+        elif rowType == self._HEADER:
+            return self._formatHeader(self._headerText())
         elif rowType == self._STATUS:
             return '<i>%s</i>' % htmlEscape(self._status)
         elif rowType == self._DIRECTORY:
-            dirPath = self._dirs[index]
-            dirPathNoSlash = os.path.split(dirPath)[0]
-            parDir, dirName = os.path.split(dirPathNoSlash)
-            return self._formatPath(dirName + '/')
+            return self._formatPath(self._dirs[index], True)
         elif rowType == self._FILE:
-            filePath = self._files[index]
-            fileName = os.path.split(filePath)[1]
-            return self._formatPath(fileName)
+            return self._formatPath(self._files[index], False)
 
     def icon(self, row, column):
         """Item icon in the list of completions
@@ -179,18 +131,89 @@ class PathCompleter(AbstractCompleter):
         rowType, index = self._classifyRowIndex(row)
         if rowType == self._ERROR:
             return qApp.style().standardIcon(QStyle.SP_MessageBoxCritical)
-        elif rowType == self._CURRENT_DIR:
+        elif rowType == self._HEADER:
             return None
         elif rowType == self._STATUS:
             return None
         elif rowType == self._DIRECTORY:
-            path = os.path.join(self.path, self._dirs[index])
-            index = _fsModel.index(path)
-            return _fsModel.data(index, Qt.DecorationRole)
+            return self._iconForPath(self._dirs[index])
         elif rowType == self._FILE:
-            path = os.path.join(self.path, self._files[index])
-            index = _fsModel.index(path)
-            return _fsModel.data(index, Qt.DecorationRole)
+            return self._iconForPath(self._files[index])
+
+
+class PathCompleter(AbstractPathCompleter):
+    """Path completer for Locator. Supports globs
+    
+    Used by Open command
+    """
+    
+    def __init__(self, text, pos):
+        AbstractPathCompleter.__init__(self, text)
+        
+        enterredDir = os.path.dirname(text)
+        enterredFile = os.path.basename(text)
+        
+        if enterredDir.startswith('/'):
+            pass
+        elif text.startswith('~'):
+            enterredDir = os.path.expanduser(enterredDir)
+        else:  # relative path
+            enterredDir = os.path.abspath(os.path.join(os.path.curdir, enterredDir))
+        
+        self._path = os.path.normpath(enterredDir)
+        if self._path != '/':
+            self._path += '/'
+
+        if not os.path.isdir(self._path):
+            self._status = 'No directory %s' % self._path
+            return
+
+        try:
+            filesAndDirs = os.listdir(self._path)
+        except OSError, ex:
+            self._error = unicode(str(ex), 'utf8')
+            return
+        
+        if not filesAndDirs:
+            self._status = 'Empty directory'
+            return
+            
+        # filter matching
+        variants = [path for path in filesAndDirs\
+                        if path.startswith(enterredFile)]
+        
+        variants = self._filterHidden(variants)
+        variants.sort()
+        
+        for variant in variants:
+            absPath = os.path.join(self._path, variant)
+            if os.path.isdir(absPath):
+                self._dirs.append(absPath)
+            else:
+                self._files.append(absPath)
+
+        if not self._dirs and not self._files:
+            self._status = 'No matching files'
+
+    def _headerText(self):
+        """Get text, which shall be displayed on the header
+        """
+        return self._path
+    
+    def _formatPath(self, path, isDir):
+        """Format file or directory for show it in the list of completions
+        """
+        path = os.path.basename(path)
+        if isDir:
+            path += '/'
+
+        typedLen = self._lastTypedSegmentLength()
+        inline = self.inline()
+        typedLenPlusInline = typedLen + len(self.inline())
+        return '<b>%s</b><u>%s</u>%s' % \
+            (htmlEscape(path[:typedLen]),
+             htmlEscape(path[typedLen:typedLenPlusInline]),
+             htmlEscape(path[typedLenPlusInline:]))
 
     def _lastTypedSegmentLength(self):
         """Length of path segment, typed by a user
@@ -214,7 +237,9 @@ class PathCompleter(AbstractCompleter):
             return None
         else:
             if self._dirs or self._files:
-                commonPart = reduce(self._commonStart, self._dirs + self._files)
+                dirs = [os.path.basename(dir) + '/' for dir in self._dirs]
+                files = [os.path.basename(file) for file in self._files]
+                commonPart = reduce(self._commonStart, dirs + files)
                 return commonPart[self._lastTypedSegmentLength():]
             else:
                 return ''
@@ -229,3 +254,33 @@ class PathCompleter(AbstractCompleter):
             row -= len(self._dirs)  # skip dirs
             if row in range(len(self._files)):
                 return self._files[row][self._lastTypedSegmentLength():]
+
+class GlobCompleter(AbstractPathCompleter):
+    """Path completer for Locator. Supports globs, does not support inline completion
+    
+    Used by Open command
+    """
+    def __init__(self, text):
+        AbstractPathCompleter.__init__(self, text)
+        variants = glob.iglob(text)
+        variants = self._filterHidden(variants)
+        variants.sort()
+        
+        for path in sorted(variants):
+            if os.path.isdir(path):
+                self._dirs.append(path)
+            else:
+                self._files.append(path)
+        
+        if not self._dirs and not self._files:
+            self._status = 'No matching files'
+
+    def _formatPath(self, path, isDir):
+        """GlobCompleter shows paths as is
+        """
+        return path
+
+    def _headerText(self):
+        """Get text, which shall be displayed on the header
+        """
+        return self._originalText
