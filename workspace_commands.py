@@ -214,7 +214,7 @@ class CommandSaveAs(AbstractCommand):
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return len(self.path) > 0
+        return len(self.path) > 0 and not os.path.isdir(self.path)
 
     def execute(self):
         """Execute command
