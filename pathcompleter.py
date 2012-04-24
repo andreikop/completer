@@ -140,6 +140,20 @@ class AbstractPathCompleter(AbstractCompleter):
         elif rowType == self._FILE:
             return self._iconForPath(self._files[index])
 
+    def getFullText(self, row):
+        """User clicked a row. Get inline completion for this row
+        """
+        row -= 1  # skip current directory
+        path = None
+        if row in range(len(self._dirs)):
+            return self._dirs[row] + '/'
+        else:
+            row -= len(self._dirs)  # skip dirs
+            if row in range(len(self._files)):
+                return self._files[row]
+        
+        return None
+
 
 class PathCompleter(AbstractPathCompleter):
     """Path completer for Locator. Supports globs
@@ -244,16 +258,6 @@ class PathCompleter(AbstractPathCompleter):
             else:
                 return ''
 
-    def inlineForRow(self, row):
-        """User clicked a row. Get inline completion for this row
-        """
-        row -= 1  # skip current directory
-        if row in range(len(self._dirs)):
-            return self._dirs[row][self._lastTypedSegmentLength():]
-        else:
-            row -= len(self._dirs)  # skip dirs
-            if row in range(len(self._files)):
-                return self._files[row][self._lastTypedSegmentLength():]
 
 class GlobCompleter(AbstractPathCompleter):
     """Path completer for Locator. Supports globs, does not support inline completion
@@ -262,7 +266,7 @@ class GlobCompleter(AbstractPathCompleter):
     """
     def __init__(self, text):
         AbstractPathCompleter.__init__(self, text)
-        variants = glob.iglob(text)
+        variants = glob.iglob(text + '*')
         variants = self._filterHidden(variants)
         variants.sort()
         

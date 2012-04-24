@@ -65,6 +65,16 @@ class AbstractCommand:
         i.e. SaveAs command is not available, if not files are opened
         """
         return True
+    
+    def constructCommand(self, completableText):
+        """After user clicked item on the TreeView, Locator
+        
+        1) gets item full text with AbstractCompleter.getFullText() method
+        2) constructs a command with this text using currentCommand.constructCommand()
+        3) sets command to the LineEdit
+        4) tries to execute the command
+        """
+        return None
 
     def isReadyToExecute(self):
         """Check if command is ready to execute.
@@ -116,7 +126,7 @@ class AbstractCompleter:
         """
         return None
     
-    def inlineForRow(self, row):
+    def getFullText(self, row):
         """Row had been clicked by mouse. Get inline completion, which will be inserted after cursor
         """
         return None
@@ -387,12 +397,16 @@ class Locator(QWidget):
         """Item in the TreeView has been clicked.
         Open file, if user selected it
         """
-        inlineForRow = self._model.completer.inlineForRow(index.row())
-        if inlineForRow is not None:
-            self._edit.insertPlainText(inlineForRow)
-            self._updateCompletion()
-            self._edit.setFocus()
-            self._onEnterPressed()
+        command = self._parseCommand(self._edit.toPlainText())
+        if command is not None:
+            newText = self._model.completer.getFullText(index.row())
+            if newText is not None:
+                newCommandText = command.constructCommand(newText)
+                if newCommandText is not None:
+                    self._edit.setPlainText(newCommandText)
+                    self._edit.setFocus()
+                    self._onEnterPressed()
+                    self._updateCompletion()
 
     def _updateCompletion(self):
         """User edited text or moved cursor. Update inline and TreeView completion

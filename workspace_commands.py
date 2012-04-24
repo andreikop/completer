@@ -136,10 +136,20 @@ class CommandOpen(AbstractCommand):
         else:
             return None
 
+    def constructCommand(self, completableText):
+        """Construct command by path
+        """
+        command = 'f ' + completableText
+        if self._line is not None:
+            command += ' %d' % self._line
+        return command
+
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
         """
-        return glob.glob(os.path.expanduser(self._path))
+        files = glob.glob(os.path.expanduser(self._path))
+        return len(files) > 0 and \
+               all([os.path.isfile(p) for p in files])
 
     def execute(self):
         """Execute the command
@@ -210,6 +220,11 @@ class CommandSaveAs(AbstractCommand):
             return PathCompleter(self._path, pos - self._pathLocation)
         else:
             return None
+
+    def constructCommand(self, completableText):
+        """Construct command by path
+        """
+        return 'f ' + completableText
 
     def isReadyToExecute(self):
         """Check if command is complete and ready to execute
